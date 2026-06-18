@@ -48,6 +48,30 @@ export function buildSupplyTx(params: {
   return tx;
 }
 
+/**
+ * Add a supply leg to an existing tx: split `amountDusdc` from `source`, supply
+ * it to the PLP vault, and transfer the PLP shares to `sender`. Lets a caller
+ * compose PLP supply with other legs (e.g. a crash-hedge mint) in one PTB.
+ */
+export function addSupply(
+  tx: Transaction,
+  params: {
+    amountDusdc: number;
+    source: TransactionObjectArgument;
+    sender: string;
+  },
+): void {
+  const [coin] = tx.splitCoins(params.source, [
+    tx.pure.u64(toDusdcU64(params.amountDusdc)),
+  ]);
+  const lp = tx.moveCall({
+    target: TARGETS.supply,
+    typeArguments: [DUSDC],
+    arguments: [tx.object(OBJECTS.predict), coin, tx.object(OBJECTS.clock)],
+  });
+  tx.transferObjects([lp], tx.pure.address(params.sender));
+}
+
 interface RangeLeg {
   oracleId: string;
   expiryMs: number;

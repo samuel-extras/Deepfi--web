@@ -44,6 +44,8 @@ export const navItems: Item[] = [
     href: "/prediction",
     label: "Prediction",
   },
+  { href: "/prediction/surface", label: "Surface" },
+  { href: "/prediction/risk", label: "Risk" },
   {
     href: "/portfolio",
     label: "Portfolio",
@@ -65,6 +67,8 @@ export const condensedNavItems: Item[] = [
   {
     label: "More",
     children: [
+      { href: "/prediction/surface", label: "Surface" },
+      { href: "/prediction/risk", label: "Risk" },
       { href: "/earn", label: "Earn", iconLeft: <EarnIcon /> },
       { href: "/social", label: "Social" },
       {

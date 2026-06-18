@@ -161,3 +161,54 @@ export function quoteRangeBinary(
   const payout = sizeDusdc * multiple;
   return { prob, payout, maxLoss: sizeDusdc, multiple };
 }
+
+// ---------- vol-surface sampling + no-arbitrage checks (Surface Studio, #9) ----------
+
+/** Annualized IV (%) across a shared log-moneyness grid `ks` for one SVI slice. */
+export function ivAcrossMoneyness(
+  p: RawSviParams,
+  tYears: number,
+  ks: number[],
+): number[] {
+  const t = Math.max(tYears, 1e-9);
+  return ks.map((k) => Math.sqrt(rawTotalVariance(k, p) / t) * 100);
+}
+
+/**
+ * Gatheral's g(k) for one slice. g(k) ≥ 0 for all k ⇔ the slice is free of
+ * butterfly arbitrage (non-negative risk-neutral density). Computed with finite
+ * differences on the raw total-variance w(k); any k with g(k) < 0 is a violation.
+ */
+export function butterflyG(p: RawSviParams, ks: number[], dk = 1e-3): number[] {
+  return ks.map((k) => {
+    const w = rawTotalVariance(k, p);
+    const wUp = rawTotalVariance(k + dk, p);
+    const wDn = rawTotalVariance(k - dk, p);
+    const wp = (wUp - wDn) / (2 * dk);
+    const wpp = (wUp - 2 * w + wDn) / (dk * dk);
+    const a = 1 - (k * wp) / (2 * w);
+    return a * a - ((wp * wp) / 4) * (1 / w + 0.25) + wpp / 2;
+  });
+}
+
+/**
+ * Calendar-arbitrage breaches across slices sorted ascending by expiry: total
+ * variance must be non-decreasing in maturity at every moneyness. Returns each
+ * (k, earlier, later) where a longer expiry has LOWER total variance.
+ */
+export function calendarBreaches(
+  slices: { label: string; p: RawSviParams }[],
+  ks: number[],
+  tol = 1e-9,
+): { k: number; earlier: string; later: string }[] {
+  const out: { k: number; earlier: string; later: string }[] = [];
+  for (let i = 0; i + 1 < slices.length; i++) {
+    for (const k of ks) {
+      const wEarly = rawTotalVariance(k, slices[i].p);
+      const wLate = rawTotalVariance(k, slices[i + 1].p);
+      if (wLate < wEarly - tol)
+        out.push({ k, earlier: slices[i].label, later: slices[i + 1].label });
+    }
+  }
+  return out;
+}

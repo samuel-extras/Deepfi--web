@@ -315,6 +315,10 @@ export const indexer = {
   oracleSviLatest: (oracleId: string) =>
     get<SviLatestRow | SviLatestRow[]>(`/oracles/${oracleId}/svi/latest`, 5),
 
+  /** Full SVI param history for an oracle (newest first). For #9 time-travel. */
+  oracleSviHistory: (oracleId: string, limit = 200) =>
+    get<SviLatestRow[]>(`/oracles/${oracleId}/svi?limit=${limit}`, 10),
+
   oraclePriceLatest: (oracleId: string) =>
     get<PriceLatestRow | PriceLatestRow[]>(
       `/oracles/${oracleId}/prices/latest`,

@@ -30,6 +30,7 @@ import {
 } from "@/lib/deepbook";
 import type { VaultSummary } from "@/lib/indexer";
 import Link from "next/link";
+import HedgedPlp from "@/components/prediction/hedge/HedgedPlp";
 
 const VAULT_BASE = `${PREDICT_INDEXER_URL}/predicts/${OBJECTS.predict}/vault`;
 const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
@@ -289,6 +290,8 @@ export default function EarnVault() {
           </Link>
         </p>
       </div>
+
+      <HedgedPlp />
 
       {/* how it works */}
       <div className="mt-6 rounded-lg border border-border bg-card/50 p-4 text-xs text-muted-foreground space-y-2">
