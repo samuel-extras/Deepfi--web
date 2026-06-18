@@ -1,0 +1,67 @@
+:root {
+  /* Core platform colors */
+  --tv-color-platform-background: #121417;
+  --tv-color-pane-background: #121417;
+
+  /* Toolbar button states - transparent backgrounds, colored text */
+  --tv-color-toolbar-button-background-hover: transparent;
+  --tv-color-toolbar-button-background-expanded: transparent;
+  --tv-color-toolbar-button-background-active: transparent;
+  --tv-color-toolbar-button-background-active-hover: transparent;
+  --tv-color-toolbar-button-background-clicked: rgba(2, 218, 139, 0.15);
+
+  /* Toolbar button text colors - green for active/hover */
+  --tv-color-toolbar-button-text: #ffffff;
+  --tv-color-toolbar-button-text-hover: #02da8b;
+  --tv-color-toolbar-button-text-active: #02da8b;
+  --tv-color-toolbar-button-text-active-hover: #02da8b;
+  --tv-color-toolbar-button-text-clicked: #02da8b;
+
+  /* Active item colors - green text only */
+  --tv-color-item-active-text: #02da8b;
+  --tv-color-toolbar-toggle-button-background-active: transparent;
+  --tv-color-toolbar-toggle-button-background-active-hover: transparent;
+
+  /* Toolbar divider */
+  --tv-color-toolbar-divider-background: #333333;
+
+  /* Popup/dropdown colors - green background with black text */
+  --tv-color-popup-background: #1a1d21;
+  --tv-color-popup-element-text: #ffffff;
+  --tv-color-popup-element-text-hover: #000000;
+  --tv-color-popup-element-background-hover: #02da8b;
+  --tv-color-popup-element-text-active: #000000;
+  --tv-color-popup-element-background-active: #02da8b;
+  --tv-color-popup-element-divider-background: #2d3134;
+
+  /* Popup toolbox colors */
+  --tv-color-popup-element-toolbox-text: #ffffff;
+  --tv-color-popup-element-toolbox-text-hover: #000000;
+  --tv-color-popup-element-toolbox-text-active-hover: #000000;
+  --tv-color-popup-element-toolbox-background-hover: #02da8b;
+  --tv-color-popup-element-toolbox-background-active-hover: #02da8b;
+
+  /* Dialog + loader accents */
+  --tv-color-dialog-header-text: #ffffff;
+  --tv-color-dialog-header-separator: #333333;
+  --tv-color-toolbar-save-layout-loader: #02da8b;
+}
+
+/* Reinforce visibility of price-axis controls */
+[class*="price-axis"] {
+  color: #f5f8ff !important;
+}
+
+[class*="price-axis"] svg,
+[class*="price-axis"] path,
+[class*="price-axis"] polygon {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+/* Keep chart toolbars aligned with the dark pane styling */
+.chart-controls-bar,
+.layout__area--bottom,
+.layout__area--right {
+  background-color: #121417 !important;
+}
