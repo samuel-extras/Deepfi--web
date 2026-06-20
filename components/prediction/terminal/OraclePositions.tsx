@@ -4,8 +4,9 @@
  * The connected wallet's open positions in the current oracle. Pulls the live
  * PredictManager portfolio (/api/portfolio) and filters to this market.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useQuery } from "@tanstack/react-query";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -42,7 +43,7 @@ const usd = (n: number) =>
   });
 
 export default function OraclePositions({ oracle }: { oracle: OracleDTO }) {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const owner = account?.address;
 
   const q = useQuery({

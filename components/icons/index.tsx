@@ -2626,3 +2626,19 @@ export function PortfolioBackgroundImage(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export const DeepbookIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="100%"
+    viewBox="0 0 88 59"
+    fill="none"
+    className="object-contain"
+    {...props}
+  >
+    <path
+      d="M87.1494 32.2275C87.1494 46.7373 75.3867 58.4998 60.877 58.5H0V32.2275H87.1494ZM60.877 0C75.3867 0.000198623 87.1493 11.7627 87.1494 26.2725H0V0H60.877Z"
+      fill="white"
+    />
+  </svg>
+);

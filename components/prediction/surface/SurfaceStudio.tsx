@@ -3,11 +3,11 @@
 /**
  * Predict Surface Studio (#9) — the live SVI volatility surface.
  *
- * Renders the on-chain vol surface as an isometric "waterfall" of per-expiry IV
- * smiles (strike × expiry → IV), with a heatmap alternative, a time-travel
+ * Renders the on-chain vol surface as per-expiry IV smiles (strike × expiry → IV)
+ * via a shadcn/recharts line chart, with a heatmap alternative, a time-travel
  * slider that replays past surface states, and a no-arbitrage checker (butterfly
  * via Gatheral g(k); calendar via total-variance monotonicity). Data + checks
- * come from /api/surface[?at=]. Dependency-free SVG so it stays fast.
+ * come from /api/surface[?at=].
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +29,13 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 type Expiry = {
   oracleId: string;
@@ -75,7 +82,6 @@ function ivColor(t: number): string {
 
 export default function SurfaceStudio() {
   const [view, setView] = useState<"surface" | "heatmap">("surface");
-  const [depth, setDepth] = useState(1);
   // time-travel: `at` is the committed timestamp the query fetches (null = live);
   // `scrub` is the slider's live position (for the label while dragging).
   const [at, setAt] = useState<number | null>(null);
@@ -148,26 +154,20 @@ export default function SurfaceStudio() {
   const displayTs = scrub ?? at ?? range.latest;
   const agoMin = Math.max(0, Math.round((range.latest - displayTs) / 60_000));
 
-  // ── isometric waterfall geometry ──────────────────────────────────────────
-  const W = 820;
-  const H = 520;
-  const ML = 56;
-  const MR = 20;
-  const MB = 64;
-  const MT = 28;
-  const depthX = 150 * depth;
-  const depthY = 110 * depth;
-  const plotW = W - ML - MR - depthX;
-  const plotH = H - MT - MB - depthY;
-  const baseY = H - MB;
-  const project = (i: number, j: number, iv: number) => {
-    const d = E > 1 ? j / (E - 1) : 0;
-    const x = ML + d * depthX + (i / Math.max(1, M - 1)) * plotW;
-    const floorY = baseY - d * depthY;
-    const y = floorY - norm(iv) * plotH;
-    return { x, y, floorY, d };
-  };
-  const midIdx = Math.floor((M - 1) / 2);
+  // ── smile chart: one line per expiry, IV (y) by moneyness (x) ─────────────
+  const chartData = moneyness.map((m, i) => {
+    const row: Record<string, number> = { m };
+    expiries.forEach((e, j) => {
+      row[`e${j}`] = e.iv[i];
+    });
+    return row;
+  });
+  const chartConfig: ChartConfig = Object.fromEntries(
+    expiries.map((e, j) => [
+      `e${j}`,
+      { label: `${e.minutesToExpiry}m`, color: ivColor(norm(e.atmIv)) },
+    ]),
+  );
 
   return (
     <div className="mx-auto w-full max-w-350 px-4 xl:px-16 py-6">
@@ -190,30 +190,15 @@ export default function SurfaceStudio() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* ── surface / heatmap ── */}
         <Card>
-          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
             <Tabs value={view} onValueChange={(v) => setView(v as typeof view)}>
               <TabsList>
-                <TabsTrigger value="surface">Surface</TabsTrigger>
+                <TabsTrigger value="surface">Smiles</TabsTrigger>
                 <TabsTrigger value="heatmap">Heatmap</TabsTrigger>
               </TabsList>
             </Tabs>
-            {view === "surface" ? (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Depth</span>
-                <Slider
-                  value={[depth]}
-                  onValueChange={([v]) => setDepth(v)}
-                  min={0.4}
-                  max={1.4}
-                  step={0.05}
-                  className="w-28"
-                />
-              </div>
-            ) : null}
-          </CardHeader>
-          <CardContent>
-            {/* time-travel */}
-            <div className="mb-4 flex items-center gap-3">
+            {/* time-travel — beside the tabs to save vertical space */}
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -252,141 +237,69 @@ export default function SurfaceStudio() {
                 {isLive ? "now" : `−${agoMin}m`}
               </span>
             </div>
-
+          </CardHeader>
+          <CardContent>
             {!hasData ? (
               <div className="flex h-[360px] items-center justify-center text-center text-sm text-muted-foreground">
                 No surface at this timestamp — scrub back toward Live.
               </div>
             ) : view === "surface" ? (
-              <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-                {/* IV axis ticks (left, front plane) */}
-                {[0, 0.5, 1].map((t) => {
-                  const y = baseY - t * plotH;
-                  return (
-                    <g key={t}>
-                      <line
-                        x1={ML}
-                        y1={y}
-                        x2={ML + plotW}
-                        y2={y}
-                        stroke="#ffffff10"
+              <ChartContainer
+                config={chartConfig}
+                className="aspect-auto h-[420px] w-full"
+              >
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 8, right: 16, bottom: 4, left: 4 }}
+                >
+                  <CartesianGrid vertical={false} stroke="#ffffff10" />
+                  <XAxis
+                    dataKey="m"
+                    type="number"
+                    domain={[-6, 6]}
+                    ticks={[-6, -3, 0, 3, 6]}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    tickFormatter={(v) =>
+                      v === 0 ? "ATM" : `${v > 0 ? "+" : ""}${v}%`
+                    }
+                  />
+                  <YAxis
+                    width={44}
+                    tickLine={false}
+                    axisLine={false}
+                    domain={["auto", "auto"]}
+                    tickFormatter={(v: number) => `${Math.round(v)}%`}
+                  />
+                  <ChartTooltip
+                    content={
+                      <ChartTooltipContent
+                        labelFormatter={(_, p) => {
+                          const m = Number(p?.[0]?.payload?.m ?? 0);
+                          return m === 0
+                            ? "ATM"
+                            : `${m > 0 ? "+" : ""}${m}% moneyness`;
+                        }}
                       />
-                      <text
-                        x={ML - 8}
-                        y={y + 3}
-                        textAnchor="end"
-                        fontSize={10}
-                        fill="#6B7280"
-                      >
-                        {pct(ivMin + t * ivRange)}
-                      </text>
-                    </g>
-                  );
-                })}
-                {/* ridges, back (furthest) → front (soonest) */}
-                {expiries
-                  .map((e, j) => ({ e, j }))
-                  .sort((a, b) => b.j - a.j)
-                  .map(({ e, j }) => {
-                    const c = ivColor(norm(e.atmIv));
-                    const pts = e.iv.map((v, i) => project(i, j, v));
-                    const firstPt = pts[0];
-                    const lastPt = pts[pts.length - 1];
-                    const line = pts
-                      .map(
-                        (p, i) =>
-                          `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
-                      )
-                      .join(" ");
-                    const area = `${line} L${lastPt.x.toFixed(1)} ${lastPt.floorY.toFixed(1)} L${firstPt.x.toFixed(1)} ${firstPt.floorY.toFixed(1)} Z`;
-                    const atm = pts[midIdx];
-                    return (
-                      <g key={e.oracleId}>
-                        <path d={area} fill={c} fillOpacity={0.16} />
-                        <path
-                          d={line}
-                          fill="none"
-                          stroke={c}
-                          strokeWidth={1.8}
-                        />
-                        <title>{`${e.minutesToExpiry}m · ATM IV ${pct(e.atmIv)} · fwd $${e.forward.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}</title>
-                        <circle
-                          cx={atm.x}
-                          cy={atm.y}
-                          r={2.6}
-                          fill="#fff"
-                          stroke={c}
-                          strokeWidth={1}
-                        />
-                        {e.butterflyKs.map((kp) => {
-                          const i = moneyness.reduce(
-                            (best, m, idx) =>
-                              Math.abs(m - kp) < Math.abs(moneyness[best] - kp)
-                                ? idx
-                                : best,
-                            0,
-                          );
-                          const p = pts[i];
-                          return (
-                            <circle
-                              key={kp}
-                              cx={p.x}
-                              cy={p.y}
-                              r={3}
-                              fill="#ef4444"
-                            />
-                          );
-                        })}
-                        <text
-                          x={firstPt.x - 6}
-                          y={firstPt.floorY + 3}
-                          textAnchor="end"
-                          fontSize={9}
-                          fill="#9CA3AF"
-                        >
-                          {e.minutesToExpiry}m
-                        </text>
-                      </g>
-                    );
-                  })}
-                {/* moneyness ticks along the front floor */}
-                {[0, midIdx, M - 1].map((i) => {
-                  const x = ML + (i / Math.max(1, M - 1)) * plotW;
-                  return (
-                    <text
-                      key={i}
-                      x={x}
-                      y={baseY + 18}
-                      textAnchor="middle"
-                      fontSize={10}
-                      fill="#6B7280"
-                    >
-                      {i === midIdx
-                        ? "ATM"
-                        : `${moneyness[i] > 0 ? "+" : ""}${moneyness[i]}%`}
-                    </text>
-                  );
-                })}
-                <text
-                  x={ML + plotW / 2}
-                  y={H - 6}
-                  textAnchor="middle"
-                  fontSize={10}
-                  fill="#6B7280"
-                >
-                  moneyness (strike vs forward) · depth = expiry →
-                </text>
-                <text
-                  x={14}
-                  y={MT + plotH / 2}
-                  textAnchor="middle"
-                  fontSize={10}
-                  fill="#6B7280"
-                  transform={`rotate(-90 14 ${MT + plotH / 2})`}
-                >
-                  implied vol
-                </text>
-              </svg>
+                    }
+                  />
+                  {expiries.map((e, j) => (
+                    <Area
+                      key={e.oracleId}
+                      dataKey={`e${j}`}
+                      type="monotone"
+                      stroke={`var(--color-e${j})`}
+                      strokeWidth={1.8}
+                      fill={`var(--color-e${j})`}
+                      fillOpacity={0.12}
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </AreaChart>
+              </ChartContainer>
             ) : (
               // ── heatmap ──
               <svg viewBox="0 0 820 420" className="w-full">

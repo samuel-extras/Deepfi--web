@@ -7,12 +7,10 @@
  * Uses predict::get_trade_amounts (devInspect) to size contract quantity from the
  * target dUSDC spend, then deposit + mint in one PTB.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -31,7 +29,7 @@ export type PredictBinaryMintArgs = {
 };
 
 export function usePredictBinaryMint() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const [isMinting, setIsMinting] = useState(false);

@@ -15,8 +15,9 @@
  * signing all live in useComboPTB — do not move logic in here.
  */
 
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useEffect, useState, type ReactNode } from "react";
-import { useCurrentAccount, ConnectButton } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { DUSDC_FAUCET_URL } from "@/lib/deepbook";
 import { useComboPTB, type ComboTradeArgs } from "@/hooks/useComboPTB";
 import Link from "next/link";
@@ -404,7 +405,7 @@ function LegCard({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ComboTrade() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const { execute, isExecuting, status } = useComboPTB();
 
   // Oracle selection
@@ -869,9 +870,18 @@ export default function ComboTrade() {
       {!account ? (
         <div className="mt-5 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-border bg-card/30 py-8">
           <p className="text-sm text-muted-foreground">
-            Connect your wallet to execute the Combo PTB
+            Sign in to execute the Combo PTB
           </p>
-          <ConnectButton />
+          <ConnectWalletDialog
+            trigger={
+              <button
+                type="button"
+                className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-[#121417]"
+              >
+                Continue with Google
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="mt-5 space-y-2.5">

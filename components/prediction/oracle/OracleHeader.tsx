@@ -4,28 +4,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, Share2, Star } from "lucide-react";
+import { Share2, Star } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OracleDetail } from "@/lib/predict";
-import {
-  ASSET_NAME,
-  assetGlyph,
-  countdown,
-  expiryLabel,
-  oracleTitle,
-  usd0,
-} from "./format";
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-muted/40 px-3 py-2">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="font-mono text-sm font-medium tabular-nums">{value}</div>
-    </div>
-  );
-}
+import { ASSET_NAME, countdown, expiryLabel, oracleTitle } from "./format";
+import { BitcoinIcon } from "@/components/icons/token-icons";
 
 export function OracleHeader({ detail }: { detail: OracleDetail }) {
   const [now, setNow] = useState(() => Date.now());
@@ -43,19 +27,9 @@ export function OracleHeader({ detail }: { detail: OracleDetail }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start gap-3">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Back to markets"
-          asChild
-        >
-          <Link href="/prediction">
-            <ArrowLeft />
-          </Link>
-        </Button>
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#F7931A] text-lg font-bold text-white">
-          {assetGlyph(detail.asset)}
+      <div className="flex items-center gap-3">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl  text-lg font-bold text-white">
+          <BitcoinIcon size={44} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -64,7 +38,7 @@ export function OracleHeader({ detail }: { detail: OracleDetail }) {
             </h1>
             <Badge variant={badge.variant}>{badge.label}</Badge>
           </div>
-          <p className="mt-0.5 text-sm text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {ASSET_NAME[detail.asset] ?? detail.asset} ·{" "}
             {detail.live
               ? `settles in ${countdown(detail.expiry - now)}`

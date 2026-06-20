@@ -3,7 +3,8 @@
 /**
  * Open orders for the margin account (cancels route through pool_proxy).
  */
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/lib/sui/deepbookSpot";
 import { getMarginPoolMeta } from "@/lib/sui/deepbookMargin";
@@ -17,7 +18,7 @@ const GTC_CUTOFF_MS = 4_102_444_800_000;
 
 export default function MarginOpenOrders({ poolKey }: { poolKey: string }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap, isLoading } = useMarginSnapshot(poolKey);
   const { cancelOrder, cancelAllOrders, claimSettled, isPending } =

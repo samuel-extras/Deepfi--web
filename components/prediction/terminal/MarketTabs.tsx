@@ -42,11 +42,11 @@ export default function MarketTabs({
   return (
     <Tabs
       defaultValue="ladder"
-      className="gap-0 overflow-hidden rounded-xl border border-white/5 bg-card"
+      className="gap-0 overflow-hidden rounded-2xl border border-white/5 bg-card"
     >
       <TabsList
         variant="line"
-        className="group-data-horizontal/tabs:h-auto w-full justify-start gap-0 overflow-x-auto rounded-none border-b border-white/5 bg-transparent p-0"
+        className="group-data-horizontal/tabs:h-auto w-full justify-start gap-0 overflow-x-auto rounded-none border-b-2 border-background bg-transparent p-0"
       >
         {TABS.map(([id, label]) => (
           <TabsTrigger
@@ -77,12 +77,6 @@ export default function MarketTabs({
           <DemoBotsButton />
         </div>
         <PredictFeed compact />
-        <a
-          href="/social"
-          className="mt-3 block text-center text-xs text-muted-foreground transition-colors hover:text-primary"
-        >
-          Full social feed →
-        </a>
       </TabsContent>
 
       <TabsContent value="comments" className="p-4">

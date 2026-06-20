@@ -16,6 +16,7 @@ import {
 import { EventsHeader } from "@/components/prediction/events/EventsHeader";
 import { SearchToolbar } from "@/components/prediction/events/SearchToolbar";
 import EventsMarketsView from "@/components/prediction/events/EventsMarketsView";
+import { BetModal } from "@/components/prediction/BetModal";
 import {
   marketsToEvents,
   groupIntoItems,
@@ -44,7 +45,7 @@ const formatDate = (dateStr?: string) => {
   });
 };
 
-export default function EventsUiCheck() {
+export default function PredictionList() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const [booting, setBooting] = useState(true);
@@ -270,6 +271,9 @@ export default function EventsUiCheck() {
           onClearAll={resetFilters}
         />
       </div>
+
+      {/* quick-bet modal — opens from a card's Yes/No (URL-driven via nuqs) */}
+      <BetModal />
     </div>
   );
 }

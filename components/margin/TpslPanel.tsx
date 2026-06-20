@@ -5,8 +5,9 @@
  * manager, executed permissionlessly by keepers when the oracle price crosses
  * the trigger. Stop loss = trigger below price; take profit = trigger above.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
 import { Button } from "@/components/ui/button";
 import { decimalsOf, formatAmount, quantizeDown } from "@/lib/sui/deepbookSpot";
 import { getMarginPoolMeta } from "@/lib/sui/deepbookMargin";
@@ -28,7 +29,7 @@ export default function TpslPanel({
   midPrice: number | null;
 }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap } = useMarginSnapshot(poolKey);
   const { data: tpsl } = useConditionalOrders(poolKey);

@@ -5,10 +5,12 @@
  * Position (risk gauge + collateral/loan management) · Open Orders ·
  * TP / SL · Order History · Earn.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useQuery } from "@tanstack/react-query";
-import { ConnectModal, useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -134,7 +136,7 @@ function EmptyState({ children }: { children: React.ReactNode }) {
 }
 
 function NeedsAccount({ label, poolKey }: { label: string; poolKey?: string }) {
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   // poolKey-less usage only renders the CTA when fully disconnected
   const manager = useMarginManager(poolKey ?? "SUI_DBUSDC");
   if (address && (poolKey ? manager.managerId : true)) return null;
@@ -142,7 +144,7 @@ function NeedsAccount({ label, poolKey }: { label: string; poolKey?: string }) {
     <div className="flex flex-col items-center gap-3 px-4 py-8">
       <p className="text-xs text-nav-inactive">{label}</p>
       {!address ? (
-        <ConnectModal
+        <ConnectWalletDialog
           trigger={
             <Button type="button" size="sm" className="rounded-full bg-primary text-[#121417] font-semibold">
               Connect wallet
@@ -170,7 +172,7 @@ type ActionKind = "deposit" | "withdraw" | "borrow" | "repay";
 
 function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number | null }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap, isLoading } = useMarginSnapshot(poolKey);
   const { data: risk } = useRiskParams(poolKey);
@@ -383,7 +385,7 @@ function Cell({ label, value, tone }: { label: string; value: string; tone?: str
 
 function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap, isLoading } = useMarginSnapshot(poolKey);
   const { cancelOrder, cancelAllOrders, claimSettled, modifyOrder, isPending } =
@@ -606,7 +608,7 @@ const historyStatusColor = (s: string) =>
 
 function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: bmId } = useMarginBmId(poolKey);
 

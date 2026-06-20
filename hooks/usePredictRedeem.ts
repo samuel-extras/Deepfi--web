@@ -4,12 +4,10 @@
  * Redeem settled / live DeepBook Predict positions and ranges.
  * Dispatches the correct PTB (redeem_range vs redeem) based on position type.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useState } from "react";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { toast } from "sonner";
 import { buildRedeemRangeTx, buildRedeemBinaryTx } from "@/lib/ptb/predict";
 import { fromDusdcU64 } from "@/lib/deepbook";
@@ -37,7 +35,7 @@ export type RedeemBinaryArgs = {
 export type RedeemArgs = RedeemRangeArgs | RedeemBinaryArgs;
 
 export function usePredictRedeem() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const [isRedeeming, setIsRedeeming] = useState(false);

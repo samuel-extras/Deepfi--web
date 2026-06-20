@@ -5,11 +5,16 @@
 // (`getJsonRpcFullnodeUrl` replaces the old `getFullnodeUrl`).
 import { getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 
-export const SUI_NETWORK = (process.env.NEXT_PUBLIC_SUI_NETWORK ??
+// NOTE: use `|| `, not `?? ` — an env var present-but-empty (`NEXT_PUBLIC_SUI_RPC_URL=`)
+// is `""`, which `?? ` would NOT fall back on. An empty URL makes SuiClient fetch the
+// app's own origin and parse HTML ("Unexpected token '<'…"). `?.trim() || default`
+// treats unset / empty / whitespace all as "use the default fullnode".
+export const SUI_NETWORK = (process.env.NEXT_PUBLIC_SUI_NETWORK?.trim() ||
   "testnet") as "testnet" | "mainnet" | "devnet" | "localnet";
 
 export const SUI_FULLNODE_URL =
-  process.env.NEXT_PUBLIC_SUI_RPC_URL ?? getJsonRpcFullnodeUrl(SUI_NETWORK);
+  process.env.NEXT_PUBLIC_SUI_RPC_URL?.trim() ||
+  getJsonRpcFullnodeUrl(SUI_NETWORK);
 
 /** dapp-kit network config (SuiClientProvider `networks` prop). */
 export const SUI_NETWORKS = {

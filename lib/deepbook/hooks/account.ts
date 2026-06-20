@@ -7,12 +7,10 @@
  * registry (falling back to a local cache) and created via a single PTB. The
  * SDK client is bound to wallet + manager so reads/writes share one config.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useMemo, useState } from "react";
-import {
-  useCurrentAccount,
-  useSignAndExecuteTransaction,
-  useSuiClient,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -26,7 +24,7 @@ const managerStorageKey = (address: string) =>
 
 /** Connected wallet address (no dev fallback — trading needs a real signer). */
 export function useDeepBookAddress(): string | undefined {
-  return useCurrentAccount()?.address;
+  return useActiveAccount()?.address;
 }
 
 /** The user's BalanceManager: discovery (registry + local cache) + creation. */

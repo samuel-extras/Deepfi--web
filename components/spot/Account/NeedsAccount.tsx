@@ -2,7 +2,7 @@
 
 /** Connect-wallet / create-trading-account prompt shown when an account action
  *  needs a signer + BalanceManager. Renders nothing once both exist. */
-import { ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { Button } from "@/components/ui/button";
 import { useBalanceManager, useDeepBookAddress } from "@/lib/deepbook/hooks/account";
 
@@ -14,7 +14,7 @@ export default function NeedsAccount({ label }: { label: string }) {
     <div className="flex flex-col items-center gap-3 px-4 py-8">
       <p className="text-xs text-nav-inactive">{label}</p>
       {!address ? (
-        <ConnectModal
+        <ConnectWalletDialog
           trigger={
             <Button type="button" size="sm" className="rounded-full bg-primary text-[#121417] font-semibold">
               Connect wallet

@@ -8,9 +8,10 @@
  * probability. Quotes stream from `usePredictQuote`. Minting reuses the
  * usePredictMint / usePredictBinaryMint / usePredictLadderMint PTB hooks.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
-import { useCurrentAccount, useSuiClientQuery } from "@mysten/dapp-kit";
+import { useSuiClientQuery } from "@mysten/dapp-kit";
 import { usePredictMint } from "@/hooks/usePredictMint";
 import { usePredictBinaryMint } from "@/hooks/usePredictBinaryMint";
 import { usePredictLadderMint } from "@/hooks/usePredictLadderMint";
@@ -100,7 +101,7 @@ export default function TradeTicket({
   onSelChange: (patch: Partial<Selection>) => void;
   initialAmount?: string;
 }) {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const [amount, setAmount] = useState(initialAmount ?? "5");
 
   // Ladder is a ticket-local mode (it has no single `sel`); binary/range drive

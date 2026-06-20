@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sponsorTransaction } from "@/lib/sui/enokiSponsor";
+import { createSponsored } from "@/lib/sui/sponsor";
 
-/** POST { transactionKindBytes, sender, allowedMoveCallTargets? } -> { bytes, digest } */
+export const runtime = "nodejs";
+
+/** POST { transactionKindBytes, sender } -> { ok, bytes, sponsorSignature, sponsor } */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     if (!body?.transactionKindBytes || !body?.sender) {
-      return NextResponse.json({ ok: false, error: "transactionKindBytes + sender required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "transactionKindBytes + sender required" },
+        { status: 400 },
+      );
     }
-    const res = await sponsorTransaction({
+    const res = await createSponsored({
       transactionKindBytes: body.transactionKindBytes,
       sender: body.sender,
-      allowedMoveCallTargets: body.allowedMoveCallTargets,
-      allowedAddresses: body.allowedAddresses,
     });
     return NextResponse.json({ ok: true, ...res });
   } catch (e) {

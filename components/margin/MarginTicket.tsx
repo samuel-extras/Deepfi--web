@@ -5,8 +5,9 @@
  * package's pool proxy. Orders spend the margin account's funds (own deposits
  * + borrowed); collateral and loans are managed in the position card below.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useMemo, useState } from "react";
-import { ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { Button } from "@/components/ui/button";
 import {
   decimalsOf,
@@ -21,7 +22,6 @@ import {
   useMarginSnapshot,
 } from "@/hooks/useDeepBookMargin";
 import type { TicketPrefill } from "@/components/spot/TradeTicket";
-import { useCurrentAccount } from "@mysten/dapp-kit";
 
 export default function MarginTicket({
   poolKey,
@@ -33,7 +33,7 @@ export default function MarginTicket({
   prefill: TicketPrefill;
 }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId, isLoading: managerLoading, create, isCreating } =
     useMarginManager(poolKey);
   const { data: params } = usePoolParams(poolKey);
@@ -214,7 +214,7 @@ export default function MarginTicket({
       </div>
 
       {!address ? (
-        <ConnectModal
+        <ConnectWalletDialog
           trigger={
             <Button className="w-full" type="button">
               Connect Sui wallet

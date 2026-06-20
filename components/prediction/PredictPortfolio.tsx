@@ -8,13 +8,11 @@
  * Also surfaces a "Withdraw to Wallet" button so users can extract their
  * manager balance back to their Sui wallet after redemptions.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { toast } from "sonner";
 import { usePredictRedeem } from "@/hooks/usePredictRedeem";
 import type { RedeemArgs } from "@/hooks/usePredictRedeem";
@@ -107,7 +105,7 @@ const STATUS_STYLES: Record<string, string> = {
 
 // ─── component ────────────────────────────────────────────────────────────────
 export default function PredictPortfolio() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const owner = account?.address;
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();

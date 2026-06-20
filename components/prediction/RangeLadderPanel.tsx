@@ -5,8 +5,9 @@
  * one atomic PTB (the "Range Ladder Vault" strategy). UI-only: the PTB flow
  * lives in `usePredictLadderMint`, shared with the trade ticket's Ladder tab.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
 import { usePredictLadderMint } from "@/hooks/usePredictLadderMint";
 import { Button } from "@/components/ui/button";
 
@@ -33,7 +34,7 @@ interface RangeLadderPanelProps {
 }
 
 export default function RangeLadderPanel({ oracle, forward }: RangeLadderPanelProps) {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const { mint, isMinting, status } = usePredictLadderMint();
 
   const [rungs, setRungs] = useState(4);

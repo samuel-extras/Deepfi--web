@@ -13,12 +13,10 @@
  * same in-PTB Pyth refresh for oracle-gated calls (deposit/withdraw/borrow/
  * proxy orders). Repay and cancels need no oracles.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useMemo, useState } from "react";
-import {
-  useCurrentAccount,
-  useSignAndExecuteTransaction,
-  useSuiClient,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { Account, DeepBookClient, Order } from "@mysten/deepbook-v3";
@@ -58,7 +56,7 @@ import { DEV_ADDRESS } from "@/lib/sui/network";
 const FLOAT_SCALAR = 1_000_000_000;
 
 function useAddress(): string | undefined {
-  return useCurrentAccount()?.address;
+  return useActiveAccount()?.address;
 }
 
 /* ------------------------- pools & risk params ------------------------ */

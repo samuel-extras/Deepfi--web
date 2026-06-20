@@ -19,6 +19,8 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { BitcoinIcon } from "@/components/icons/token-icons";
+import { useBetParams } from "@/hooks/useBetParams";
+import type { Direction } from "@/components/prediction/terminal/types";
 
 interface EventCardProps {
   event: PredictEvent;
@@ -58,6 +60,7 @@ export function EventCard({
 }: EventCardProps) {
   const p = event.predict;
   const isActive = p.status === "active";
+  const { open: openBet } = useBetParams();
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -131,38 +134,45 @@ export function EventCard({
         {/* Choices (live) · pending (settling) · resolution (settled) */}
         {isLive ? (
           <div className="flex flex-col gap-2">
-            {rows.map((row) => (
-              <div
-                key={row.label}
-                className="relative flex items-center justify-between gap-3 overflow-hidden rounded-full bg-muted/30 px-3 py-2"
-              >
-                <div className="relative z-10 flex flex-1 justify-between items-baseline gap-2">
-                  <span className="text-sm font-medium">{row.label}</span>
-                  {row.pct != null && (
-                    <span className="text-xs text-muted-foreground">
-                      ~{row.pct}¢
-                    </span>
-                  )}
+            {rows.map((row) => {
+              // "Above Yes" = bet BTC settles up; "Below Yes" = down. "No" flips.
+              const yesDir: Direction = row.label === "Above" ? "up" : "down";
+              const noDir: Direction = yesDir === "up" ? "down" : "up";
+              return (
+                <div
+                  key={row.label}
+                  className="relative flex items-center justify-between gap-3 overflow-hidden rounded-full bg-muted/30 px-3 py-2"
+                >
+                  <div className="relative z-10 flex flex-1 justify-between items-baseline gap-2">
+                    <span className="text-sm font-medium">{row.label}</span>
+                    {row.pct != null && (
+                      <span className="text-xs text-muted-foreground">
+                        ~{row.pct}¢
+                      </span>
+                    )}
+                  </div>
+                  <ButtonGroup className="gap-0!">
+                    <Button
+                      variant="success"
+                      size="sm"
+                      className="rounded-l-full! "
+                      onClick={() => openBet(p.oracleId, yesDir)}
+                    >
+                      Yes
+                    </Button>
+                    {/* <ButtonGroupSeparator /> */}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="-ml-px px-3"
+                      onClick={() => openBet(p.oracleId, noDir)}
+                    >
+                      No
+                    </Button>
+                  </ButtonGroup>
                 </div>
-                <ButtonGroup className="gap-0!">
-                  <Button
-                    variant="success"
-                    size="sm"
-                    className="rounded-l-full! "
-                  >
-                    Yes
-                  </Button>
-                  {/* <ButtonGroupSeparator /> */}
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="-ml-px px-3"
-                  >
-                    No
-                  </Button>
-                </ButtonGroup>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : isSettling ? (
           <div className="flex items-center justify-center rounded-full border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground mt-auto">

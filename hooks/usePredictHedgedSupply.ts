@@ -7,12 +7,10 @@
  * spread) AND mints an out-of-the-money DOWN binary as crash insurance — "PLP
  * yield minus left-tail." Mirrors usePredictBinaryMint's manager + sizing flow.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -38,7 +36,7 @@ export type HedgedSupplyArgs = {
 };
 
 export function usePredictHedgedSupply() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const [isPending, setIsPending] = useState(false);

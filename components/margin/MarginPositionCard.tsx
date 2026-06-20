@@ -5,8 +5,9 @@
  * equity/debt/leverage, and the collateral & loan management form
  * (deposit / withdraw / borrow / repay).
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
 import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/lib/sui/deepbookSpot";
 import {
@@ -39,7 +40,7 @@ export default function MarginPositionCard({
   midPrice: number | null;
 }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap, isLoading } = useMarginSnapshot(poolKey);
   const { data: risk } = useRiskParams(poolKey);

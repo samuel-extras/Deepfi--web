@@ -10,7 +10,9 @@
  */
 
 export const DEEPBOOK_INDEXER =
-  process.env.NEXT_PUBLIC_DEEPBOOK_INDEXER ??
+  // `|| `, not `?? ` — a present-but-empty env (`NEXT_PUBLIC_DEEPBOOK_INDEXER=`) is
+  // `""`, which would otherwise make fetch hit the app's own origin.
+  process.env.NEXT_PUBLIC_DEEPBOOK_INDEXER?.trim() ||
   "https://deepbook-indexer.testnet.mystenlabs.com";
 
 async function idx<T>(path: string): Promise<T> {

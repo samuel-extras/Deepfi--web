@@ -8,7 +8,7 @@
  * Presentation only: all state, math, and zod validation live in
  * `useSpotTicket`; this component just lays out the pieces.
  */
-import { ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/lib/deepbook/core";
 import OrderTypeTabs from "./OrderTypeTabs";
@@ -97,7 +97,7 @@ export default function SpotTicket({
       {/* footer: submit + summary */}
       <div className="px-4 pt-6 pb-4 space-y-3 mt-auto">
         {!t.address ? (
-          <ConnectModal
+          <ConnectWalletDialog
             trigger={
               <Button
                 type="button"

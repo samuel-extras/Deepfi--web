@@ -6,12 +6,12 @@ import * as React from "react";
 import { NavLinkItem, NavDropdown } from "./nav-link-item";
 import { Button } from "@/components/ui/button";
 import { CompetitionIcon, EarnIcon, LogoIcon } from "@/components/icons";
-import { useModalStore } from "../modals/model/useModalStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { usePrivy } from "@privy-io/react-auth";
 import UserMenu from "./UserMenu";
 import { useDisconnect } from "wagmi";
-import { ConnectModal, useDisconnectWallet } from "@mysten/dapp-kit";
+import { useDisconnectWallet } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { MobileNav } from "./MobileNav";
 import { HamburgerIcon } from "./HamburgerIcon";
 import { useUserProfileStore } from "@/stores/useUserProfileStore";
@@ -157,7 +157,6 @@ function renderNavItem(
 
 export default function Navbar() {
   const router = useRouter();
-  const { openModal } = useModalStore();
   const pathname = usePathname();
   const { isAuthenticated, userInfo, logout } = useAuthStore();
   const resetUserProfile = useUserProfileStore((state) => state.reset);
@@ -165,6 +164,7 @@ export default function Navbar() {
   const { disconnect } = useDisconnect();
   const { mutate: disconnectSui } = useDisconnectWallet();
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+  const [connectOpen, setConnectOpen] = React.useState(false);
 
   // Get app settings from granular selectors (avoids re-rendering entire
   // Navbar when any unrelated setting changes)
@@ -254,8 +254,8 @@ export default function Navbar() {
   );
 
   const handleConnectAccount = React.useCallback(() => {
-    openModal("connectAccount", { onConfirm: () => {} });
-  }, [openModal]);
+    setConnectOpen(true);
+  }, []);
 
   const handleNavigationStart = React.useCallback(
     (href: string) => {
@@ -346,7 +346,9 @@ export default function Navbar() {
 
         <div className="flex items-center gap-2">
           {!isAuthenticated ? (
-            <ConnectModal
+            <ConnectWalletDialog
+              open={connectOpen}
+              onOpenChange={setConnectOpen}
               trigger={
                 <Button
                   className="font-semibold text-xs text-[#0E0E0E] rounded-[25px] hover:cursor-pointer"

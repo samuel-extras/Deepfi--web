@@ -66,7 +66,7 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
           cache: "no-store",
         }).then(r => r.json());
         if (cancelled) return;
-        const v = pr?.summary?.account_value;
+        const v = pr?.summary?.accountValue;
         if (typeof v === "number") setPredictionsBalance(String(v));
       } catch {
         /* leave predictions as-is */

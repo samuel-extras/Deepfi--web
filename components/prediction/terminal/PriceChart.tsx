@@ -22,7 +22,7 @@ import {
   YAxis,
 } from "recharts";
 import type { PricePoint, Selection } from "./types";
-import { AXIS, DOWN, UP, clockTime, compactUsd, usd0, usd2 } from "./types";
+import { AXIS, BTC, UP, clockTime, compactUsd, usd0, usd2 } from "./types";
 
 const GRID = "#ffffff14";
 
@@ -88,13 +88,23 @@ function StrikeTag(props: {
   );
 }
 
-export default function PriceChart({ points, expiry, sel, height = 340 }: Props) {
+export default function PriceChart({
+  points,
+  expiry,
+  sel,
+  height = 340,
+}: Props) {
   const last = points.at(-1) ?? null;
 
   const { yMin, yMax } = useMemo(() => {
-    const ys = points.map(p => p.spot);
-    if (sel.posType === "binary" && sel.strikeUsd != null) ys.push(sel.strikeUsd);
-    if (sel.posType === "range" && sel.lowerUsd != null && sel.higherUsd != null)
+    const ys = points.map((p) => p.spot);
+    if (sel.posType === "binary" && sel.strikeUsd != null)
+      ys.push(sel.strikeUsd);
+    if (
+      sel.posType === "range" &&
+      sel.lowerUsd != null &&
+      sel.higherUsd != null
+    )
       ys.push(sel.lowerUsd, sel.higherUsd);
     if (!ys.length) return { yMin: 0, yMax: 1 };
     const lo = Math.min(...ys);
@@ -103,26 +113,29 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
     return { yMin: lo - pad, yMax: hi + pad };
   }, [points, sel]);
 
-  const xMin = points[0]?.t ?? Date.now() - 60_000;
+  const xMin = points[0]?.t ?? expiry - 60_000;
   const xMax = Math.max(expiry, last?.t ?? 0);
 
   const winZone: [number, number] | null = useMemo(() => {
     if (sel.posType === "binary" && sel.strikeUsd != null) {
-      return sel.direction === "up" ? [sel.strikeUsd, yMax] : [yMin, sel.strikeUsd];
+      return sel.direction === "up"
+        ? [sel.strikeUsd, yMax]
+        : [yMin, sel.strikeUsd];
     }
-    if (sel.posType === "range" && sel.lowerUsd != null && sel.higherUsd != null) {
+    if (
+      sel.posType === "range" &&
+      sel.lowerUsd != null &&
+      sel.higherUsd != null
+    ) {
       return [sel.lowerUsd, sel.higherUsd];
     }
     return null;
   }, [sel, yMin, yMax]);
 
-  const inZone =
-    winZone && last ? last.spot >= winZone[0] && last.spot <= winZone[1] : false;
-
   if (!points.length) {
     return (
       <div
-        className="w-full animate-pulse rounded-xl bg-white/[0.03]"
+        className="w-full animate-pulse rounded-xl bg-white/3"
         style={{ height }}
       />
     );
@@ -136,13 +149,16 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
   })();
 
   return (
-    <div className="relative w-full" style={{ height }}>
+    <div className="relative w-full " style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={points} margin={{ top: 14, right: 56, bottom: 0, left: 8 }}>
+        <ComposedChart
+          data={points}
+          margin={{ top: 14, right: 56, bottom: 0, left: 8 }}
+        >
           <defs>
             <linearGradient id="spotFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={UP} stopOpacity={0.22} />
-              <stop offset="100%" stopColor={UP} stopOpacity={0} />
+              <stop offset="0%" stopColor={BTC} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={BTC} stopOpacity={0} />
             </linearGradient>
           </defs>
 
@@ -151,7 +167,7 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
             type="number"
             domain={[xMin, xMax]}
             ticks={xTicks}
-            tickFormatter={t => clockTime(t)}
+            tickFormatter={(t) => clockTime(t)}
             stroke={AXIS}
             fontSize={10}
             tickLine={false}
@@ -166,7 +182,9 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
             tickLine={false}
             axisLine={false}
             width={52}
-            tickFormatter={v => (yMax - yMin < 2500 ? usd0(v) : compactUsd(v))}
+            tickFormatter={(v) =>
+              yMax - yMin < 2500 ? usd0(v) : compactUsd(v)
+            }
           />
 
           {/* win zone */}
@@ -262,12 +280,12 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
           <Area
             type="monotone"
             dataKey="spot"
-            stroke={UP}
+            stroke={BTC}
             strokeWidth={1.8}
             fill="url(#spotFill)"
             dot={false}
             isAnimationActive={false}
-            activeDot={{ r: 3.5, fill: UP, strokeWidth: 0 }}
+            activeDot={{ r: 3.5, fill: BTC, strokeWidth: 0 }}
           />
 
           {/* live price marker + right-edge tag */}
@@ -277,22 +295,16 @@ export default function PriceChart({ points, expiry, sel, height = 340 }: Props)
                 x={last.t}
                 y={last.spot}
                 r={3.5}
-                fill={inZone || !winZone ? UP : DOWN}
+                fill={BTC}
                 stroke="#121417"
                 strokeWidth={1.5}
               />
               <ReferenceLine
                 y={last.spot}
-                stroke={inZone || !winZone ? UP : DOWN}
+                stroke={BTC}
                 strokeOpacity={0.35}
                 strokeDasharray="2 3"
-                label={
-                  <PriceTag
-                    value={usd2(last.spot)}
-                    fill={inZone || !winZone ? UP : DOWN}
-                    textFill={inZone || !winZone ? "#081A12" : "#FFFFFF"}
-                  />
-                }
+                label={<PriceTag value={usd2(last.spot)} fill={BTC} textFill="#081A12" />}
               />
             </>
           ) : null}

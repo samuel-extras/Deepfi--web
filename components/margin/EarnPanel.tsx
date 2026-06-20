@@ -5,8 +5,9 @@
  * interest margin traders pay. One SupplierCap (minted automatically on first
  * supply) tracks positions across every pool.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
-import { useCurrentAccount, ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { Button } from "@/components/ui/button";
 import { formatAmount } from "@/lib/sui/deepbookSpot";
 import { useWalletBalances } from "@/hooks/useDeepBookSpot";
@@ -15,7 +16,7 @@ import { useEarnActions, useEarnPools } from "@/hooks/useDeepBookMargin";
 const SUI_GAS_RESERVE = 0.3;
 
 export default function EarnPanel() {
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { data: pools, isLoading } = useEarnPools();
   const { data: walletBal } = useWalletBalances();
   const { supply, withdraw, isPending, status } = useEarnActions();
@@ -141,7 +142,7 @@ export default function EarnPanel() {
               </button>
             </div>
             {!address ? (
-              <ConnectModal
+              <ConnectWalletDialog
                 trigger={
                   <Button type="button" size="sm">
                     Connect wallet

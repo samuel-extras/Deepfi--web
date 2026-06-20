@@ -19,6 +19,7 @@ import { OBJECTS, TARGETS, toStrikeU64 } from "@/lib/deepbook";
 import { ivFromRawSvi, probInRange } from "@/lib/svi";
 import type { Direction, OracleDTO, Selection, SviResponse } from "./types";
 import { snapToTick, usd0, usd2 } from "./types";
+import { Button } from "@/components/ui/button";
 
 const Q0 = 1_000_000;
 const ZERO_SENDER = "0x" + "0".repeat(64);
@@ -33,7 +34,8 @@ function useBinaryLadderQuotes(
   strikes: number[],
 ): LadderQuotes | null {
   const client = useSuiClient();
-  const live = !!oracle && oracle.status === "active" && oracle.expiry > Date.now();
+  const live =
+    !!oracle && oracle.status === "active" && oracle.expiry > Date.now();
   const q = useQuery({
     queryKey: ["predict", "ladder", oracle?.oracleId, strikes.join("|")],
     enabled: live && strikes.length > 0,
@@ -93,13 +95,14 @@ function useRangeLadderQuotes(
   bands: [number, number][],
 ): LadderQuotes | null {
   const client = useSuiClient();
-  const live = !!oracle && oracle.status === "active" && oracle.expiry > Date.now();
+  const live =
+    !!oracle && oracle.status === "active" && oracle.expiry > Date.now();
   const q = useQuery({
     queryKey: [
       "predict",
       "ladder-range",
       oracle?.oracleId,
-      bands.map(b => b.join("-")).join("|"),
+      bands.map((b) => b.join("-")).join("|"),
     ],
     enabled: live && bands.length > 0,
     refetchInterval: 8_000,
@@ -166,20 +169,20 @@ function PriceBtn({
   onClick: () => void;
 }) {
   const base =
-    "min-w-[88px] cursor-pointer rounded-lg border px-2.5 py-1.5 text-xs font-bold tabular-nums transition-all duration-150";
+    "min-w-[88px] cursor-pointer rounded-full border px-2.5 py-1.5 text-xs font-bold tabular-nums transition-all duration-150";
   const palette =
     tone === "up"
       ? selected
         ? "border-[#02DA8B] bg-[#02DA8B] text-[#081A12] shadow-[0_0_12px_rgba(2,218,139,0.25)]"
         : "border-[#02DA8B]/25 bg-[#02DA8B]/10 text-[#02DA8B] hover:bg-[#02DA8B]/20"
       : selected
-        ? "border-[#EF4444] bg-[#EF4444] text-white shadow-[0_0_12px_rgba(239,68,68,0.25)]"
+        ? "border-[#EF4444] bg-[#EF4444] text-white shadow-[0_0_12px_rgba(239,68,68,0.25)] hover:bg-[#EF4444]"
         : "border-[#EF4444]/25 bg-[#EF4444]/10 text-[#EF4444] hover:bg-[#EF4444]/20";
   return (
-    <button onClick={onClick} className={`${base} ${palette}`}>
+    <Button onClick={onClick} className={`${base} ${palette}`}>
       {label}{" "}
       {price != null ? `${est ? "~" : ""}${Math.round(price * 100)}¢` : "—"}
-    </button>
+    </Button>
   );
 }
 
@@ -226,7 +229,7 @@ export default function StrikeLadder({
     if (atm == null) return [];
     const out: number[] = [];
     for (let i = LADDER_HALF; i >= -LADDER_HALF; i--) out.push(atm + i * step);
-    return out.filter(s => s >= oracle.minStrike);
+    return out.filter((s) => s >= oracle.minStrike);
   }, [atm, step, oracle.minStrike]);
 
   const bands = useMemo<[number, number][]>(() => {
@@ -330,7 +333,9 @@ export default function StrikeLadder({
                     {spot != null ? (
                       <span
                         className={`font-mono text-[10px] tabular-nums ${
-                          strike >= spot ? "text-[#02DA8B]/70" : "text-[#FF5C5C]/70"
+                          strike >= spot
+                            ? "text-[#02DA8B]/70"
+                            : "text-[#FF5C5C]/70"
                         }`}
                       >
                         {strike >= spot ? "+" : ""}

@@ -8,7 +8,7 @@
  * ("auto top-up"), so a first trade is still a single signature.
  */
 import { useMemo, useState } from "react";
-import { ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { Button } from "@/components/ui/button";
 import {
   decimalsOf,
@@ -272,7 +272,7 @@ export default function TradeTicket({
 
       {/* CTA */}
       {!address ? (
-        <ConnectModal
+        <ConnectWalletDialog
           trigger={
             <Button className="w-full" type="button">
               Connect Sui wallet

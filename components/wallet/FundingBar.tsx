@@ -8,8 +8,9 @@
  * When disconnected it prompts to connect; when dUSDC is 0 it highlights the
  * faucet so a user can actually reach a mint.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useState } from "react";
-import { useCurrentAccount, useSuiClientQuery } from "@mysten/dapp-kit";
+import { useSuiClientQuery } from "@mysten/dapp-kit";
 import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
 import { toast } from "sonner";
 import { COIN_TYPES, DUSDC_FAUCET_URL } from "@/lib/deepbook";
@@ -22,7 +23,7 @@ const fmt = (raw: string | undefined, decimals: number, dp = 4) =>
       });
 
 export default function FundingBar() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const owner = account?.address;
   const [requesting, setRequesting] = useState(false);
 

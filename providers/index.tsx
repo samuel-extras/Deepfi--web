@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { WagmiProvider } from "./WagmiProvider";
 import { InitProvider } from "./InitProvider";
 import { QueryProvider } from "./queryProvider";
@@ -11,7 +12,9 @@ const Providers = ({ children }: { children: ReactNode }) => {
     <WagmiProvider>
         <QueryProvider>
           <SuiProvider>
-            <InitProvider>{children}</InitProvider>
+            <NuqsAdapter>
+              <InitProvider>{children}</InitProvider>
+            </NuqsAdapter>
           </SuiProvider>
         </QueryProvider>
     </WagmiProvider>

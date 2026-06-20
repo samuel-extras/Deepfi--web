@@ -11,14 +11,11 @@
  * public predict-server; APY is annualized from the vault's real PLP
  * share-price history. Supply is a single on-chain `predict::supply`.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-  useSuiClientQuery,
-} from "@mysten/dapp-kit";
+import { useSuiClient, useSuiClientQuery } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { toast } from "sonner";
 import {
@@ -80,7 +77,7 @@ const fmtU6 = (n?: number) =>
     : `$${(n / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
 export default function EarnVault() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const owner = account?.address;
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();

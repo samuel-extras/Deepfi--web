@@ -1,6 +1,6 @@
-// DeepBook Predict — markets listing (the prediction home).
-import EventsUiCheck from "./EventsUiCheck";
+import PredictionList from "@/components/prediction/Predictions";
 
+// DeepBook Predict — markets listing (the prediction home).
 export const metadata = {
   title: "Prediction Markets",
   description:
@@ -8,5 +8,5 @@ export const metadata = {
 };
 
 export default function PredictionPage() {
-  return <EventsUiCheck />;
+  return <PredictionList />;
 }

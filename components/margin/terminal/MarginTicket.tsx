@@ -6,8 +6,9 @@
  * margin account's funds (own collateral + borrowed); borrowing itself lives
  * in the Position tab below, like a perp venue's margin controls.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useMemo, useState } from "react";
-import { ConnectModal } from "@mysten/dapp-kit";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +45,6 @@ import {
   useMarginSnapshot,
   useRiskParams,
 } from "@/hooks/useDeepBookMargin";
-import { useCurrentAccount } from "@mysten/dapp-kit";
 import type { TerminalPrefill } from "@/components/spot/Ticket/types";
 
 const FEE_BUFFER = 0.02;
@@ -61,7 +61,7 @@ export default function MarginTicket({
   prefill: TerminalPrefill;
 }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const {
     managerId,
     isLoading: managerLoading,
@@ -683,7 +683,7 @@ export default function MarginTicket({
 
       <div className="px-4 pt-6 pb-4 space-y-3 mt-auto">
         {!address ? (
-          <ConnectModal
+          <ConnectWalletDialog
             trigger={
               <Button
                 type="button"

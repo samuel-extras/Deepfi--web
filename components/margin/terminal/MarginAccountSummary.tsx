@@ -7,10 +7,11 @@
  * price, effective leverage, and borrow capacity. Per-side deposit / borrow /
  * repay lives in the Position tab.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+
 import { formatAmount } from "@/lib/sui/deepbookSpot";
 import {
   effectiveLeverage,
@@ -38,7 +39,7 @@ export default function MarginAccountSummary({
   className?: string;
 }) {
   const pool = getMarginPoolMeta(poolKey);
-  const address = useCurrentAccount()?.address;
+  const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
   const { data: snap } = useMarginSnapshot(poolKey);
   const { data: risk } = useRiskParams(poolKey);

@@ -45,47 +45,48 @@ export function OracleFaq({ detail }: { detail: OracleDetail }) {
   ];
 
   return (
-    <section className=" py-10 ">
-      <div className="mx-auto max-w-5xl px-4 md:px-6">
-        <div>
-          <h2 className="text-foreground text-2xl font-semibold">
-            Frequently Asked Questions
-          </h2>
-          <p className="text-muted-foreground mt-4 text-balance ">
-            Discover quick and comprehensive answers to common questions about
-            our platform, services, and features.
-          </p>
-        </div>
+    <section className="mt-4 ">
+      <div>
+        <h2 className="text-foreground text-lg font-semibold">
+          Frequently Asked Questions
+        </h2>
+        <p className="text-muted-foreground text-sm text-balance ">
+          Discover quick and comprehensive answers to common questions about our
+          platform, services, and features.
+        </p>
+      </div>
 
-        <div className="mt-6">
-          <Accordion
-            type="single"
-            collapsible
-            className="bg-card ring-foreground/5 rounded-(--radius) w-full border border-transparent px-8 py-3 shadow ring-1"
+      <div className="mt-4">
+        <Accordion
+          type="single"
+          collapsible
+          className="bg-card ring-foreground/5 rounded-3xl  w-full border border-transparent px-8 py-3 shadow ring-1"
+        >
+          {faqs.map((item) => (
+            <AccordionItem
+              key={item.q}
+              value={item.q}
+              className="border-dashed"
+            >
+              <AccordionTrigger className="cursor-pointer text-base hover:no-underline text-muted-foreground">
+                {item.q}
+              </AccordionTrigger>
+              <AccordionContent>
+                <p className="text-sm">{item.a}</p>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+
+        <p className="text-muted-foreground text-sm mt-4">
+          Can&apos;t find what you&apos;re looking for?{" "}
+          <Link
+            href="#"
+            className="text-foreground font-medium hover:underline"
           >
-            {faqs.map((item) => (
-              <AccordionItem
-                key={item.q}
-                value={item.q}
-                className="border-dotted"
-              >
-                <AccordionTrigger className="cursor-pointer text-base hover:no-underline">
-                  {item.q}
-                </AccordionTrigger>
-                <AccordionContent>
-                  <p className="text-base">{item.a}</p>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-
-          <p className="text-muted-foreground text-sm mt-4">
-            Can&apos;t find what you&apos;re looking for? Contact our{" "}
-            <Link href="#" className="text-primary font-medium hover:underline">
-              customer support team
-            </Link>
-          </p>
-        </div>
+            Contact our support team
+          </Link>
+        </p>
       </div>
     </section>
   );

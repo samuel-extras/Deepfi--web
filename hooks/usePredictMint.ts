@@ -13,12 +13,10 @@
  * Pure mint (no spot swap) — works with the user's own dUSDC, so it doesn't need
  * the (undeployed) SUI/dUSDC pool the combo trade would.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
-import {
-  useCurrentAccount,
-  useSuiClient,
-  useSignAndExecuteTransaction,
-} from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
+import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -37,7 +35,7 @@ export type PredictMintArgs = {
 };
 
 export function usePredictMint() {
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
   const [isMinting, setIsMinting] = useState(false);

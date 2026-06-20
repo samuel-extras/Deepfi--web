@@ -10,8 +10,9 @@
  *
  * Prices are per $1-payout contract, so price ≈ implied probability.
  */
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
+import { useSuiClient } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { OBJECTS, TARGETS, toStrikeU64 } from "@/lib/deepbook";
@@ -58,7 +59,7 @@ export function usePredictQuote(
   svi?: SviResponse,
 ): Quote {
   const client = useSuiClient();
-  const account = useCurrentAccount();
+  const account = useActiveAccount();
   const live = !!oracle && oracle.status === "active" && oracle.expiry > Date.now();
   const enabled = live && selectionValid(sel);
 

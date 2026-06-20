@@ -17,6 +17,8 @@ export type OracleDTO = {
 export type OraclesResponse = {
   ok: boolean;
   active: OracleDTO[];
+  /** A handful of the most-recently-settled markets, for the "Past" rail. */
+  settled?: OracleDTO[];
 };
 
 export type SviResponse = {
@@ -57,6 +59,7 @@ export type Selection = {
 // ─── theme (dex design language) ──────────────────────────────────────────────
 export const UP = "#02DA8B";
 export const DOWN = "#EF4444";
+export const BTC = "#F7931A"; // Bitcoin gold — the price line on the BTC chart
 export const DOWN_TEXT = "#FF5C5C";
 export const MUTED = "#6B7280";
 export const AXIS = "#A9A9A9";

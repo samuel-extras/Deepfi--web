@@ -35,7 +35,7 @@ import { OracleRules } from "../oracle/OracleRules";
 import { OracleFaq } from "../oracle/OracleFaq";
 import { OracleDetail } from "@/lib/predict";
 
-const RAIL_MAX = 8; // soonest expiries shown on the rail
+const RAIL_MAX = 9; // soonest expiries on the rail (3 inline pills + up to 6 in "More")
 
 export type MirrorParams = {
   size: number | null;
@@ -82,24 +82,40 @@ export default function PredictTerminal({
     refetchInterval: 10_000,
   });
   const active = useMemo(() => oraclesQ.data?.active ?? [], [oraclesQ.data]);
+  // a few recently-settled markets — selectable on the rail's "Past" dropdown,
+  // shown read-only (historical chart, closed ticket).
+  const settledOracles = useMemo(
+    () => oraclesQ.data?.settled ?? [],
+    [oraclesQ.data],
+  );
 
-  // rail: one chip per distinct expiry, soonest first, capped
+  // rail: one chip per distinct expiry, soonest first, capped. The server lists
+  // active oracles unsorted and can still include an already-expired one, so
+  // drop anything past expiry and sort before slicing. "now" is sourced from the
+  // query's fetch timestamp (a pure render value) and refreshes every refetch.
+  const fetchedAt = oraclesQ.dataUpdatedAt;
   const railOracles = useMemo(() => {
     const seen = new Set<number>();
     const out: OracleDTO[] = [];
-    for (const o of active) {
+    const live = active
+      .filter((o) => o.expiry > fetchedAt)
+      .sort((a, b) => a.expiry - b.expiry);
+    for (const o of live) {
       if (seen.has(o.expiry)) continue;
       seen.add(o.expiry);
       out.push(o);
       if (out.length >= RAIL_MAX) break;
     }
     return out;
-  }, [active]);
+  }, [active, fetchedAt]);
 
   const oracle: OracleDTO | null = useMemo(
     () =>
-      active.find((o) => o.oracleId === selectedId) ?? railOracles[0] ?? null,
-    [active, railOracles, selectedId],
+      active.find((o) => o.oracleId === selectedId) ??
+      settledOracles.find((o) => o.oracleId === selectedId) ??
+      railOracles[0] ??
+      null,
+    [active, settledOracles, railOracles, selectedId],
   );
 
   const sviQ = useQuery({
@@ -122,6 +138,30 @@ export default function PredictTerminal({
   });
   const points = useMemo(() => pricesQ.data?.points ?? [], [pricesQ.data]);
   const spot = pricesQ.data?.spot ?? null;
+
+  // page header tracks the *selected* oracle so it follows rail changes (incl.
+  // past markets). For the route's own oracle we keep the server `detail`, which
+  // carries the richer settled / SVI fields.
+  const headerDetail: OracleDetail | null = useMemo(() => {
+    if (!oracle) return null;
+    if (detail && detail.oracleId === oracle.oracleId) return detail;
+    return {
+      oracleId: oracle.oracleId,
+      asset: oracle.asset,
+      expiry: oracle.expiry,
+      status: oracle.status,
+      live: railOracles.some((o) => o.oracleId === oracle.oracleId),
+      minStrike: oracle.minStrike,
+      tickSize: oracle.tickSize,
+      settlementPrice: oracle.settlementPrice,
+      atmStrike: null,
+      aboveProb: null,
+      atmIv: svi?.atmIv ?? null,
+      forward: svi?.forward ?? spot ?? null,
+      activatedAt: null,
+      settledAt: null,
+    };
+  }, [oracle, detail, railOracles, svi?.atmIv, svi?.forward, spot]);
 
   // ── selection lifecycle ───────────────────────────────────────────────────
   const tick = Math.max(oracle?.tickSize ?? 1, 1);
@@ -148,6 +188,28 @@ export default function PredictTerminal({
     }
     prevOracleId.current = oracle.oracleId;
   }, [oracle]);
+
+  // auto-advance: the instant the active market expires, roll the selection
+  // forward to the next soonest live oracle so the page never sits on a dead
+  // market (don't wait for the 10s refetch). Skipped when the user is viewing a
+  // settled market on purpose — leave them there.
+  useEffect(() => {
+    if (!oracle) return;
+    if (settledOracles.some((o) => o.oracleId === oracle.oracleId)) return;
+    const advance = () => {
+      const next = railOracles.find(
+        (o) => o.oracleId !== oracle.oracleId && o.expiry > Date.now(),
+      );
+      if (next) setSelectedId(next.oracleId);
+    };
+    const msLeft = oracle.expiry - Date.now();
+    if (msLeft <= 0) {
+      advance();
+      return;
+    }
+    const id = setTimeout(advance, msLeft + 200);
+    return () => clearTimeout(id);
+  }, [oracle, railOracles, settledOracles]);
 
   // fill empty strikes once the grid is known (and apply a mirror link once)
   useEffect(() => {
@@ -265,29 +327,52 @@ export default function PredictTerminal({
       <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:gap-12 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* ── left: market ── */}
         <div className="min-w-0 space-y-4">
-          {detail && <OracleHeader detail={detail} />}
-          <div className="mt-4">
-            <ExpiryRail
-              oracles={railOracles}
-              selectedId={oracle.oracleId}
-              onSelect={(o) => setSelectedId(o.oracleId)}
-            />
-          </div>
-          <div className="rounded-xl border border-white/5 p-4">
-            <MarketHeader oracle={oracle} points={points} atmIv={svi?.atmIv} />
-
-            {/* chart tabs — BTC price by default, or the on-chain vol surface */}
-            <Tabs defaultValue="price" className="mt-4">
-              <TabsList>
-                <TabsTrigger value="price">BTC Price</TabsTrigger>
-                <TabsTrigger value="smile">Vol Surface</TabsTrigger>
+          {detail && headerDetail && <OracleHeader detail={headerDetail} />}
+          {/* chart switch (BTC price / vol surface) shares the expiry-rail row
+              so it costs no extra vertical space */}
+          <Tabs defaultValue="price">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <ExpiryRail
+                  oracles={railOracles}
+                  pastOracles={settledOracles}
+                  selectedId={oracle.oracleId}
+                  onSelect={(o) => setSelectedId(o.oracleId)}
+                />
+              </div>
+              <TabsList className="shrink-0 rounded-full">
+                <TabsTrigger
+                  className="text-xs rounded-full data-active:bg-background data-active:text-foreground dark:data-active:border-transparent dark:data-active:bg-background dark:data-active:text-foreground"
+                  value="price"
+                >
+                  BTC Price
+                </TabsTrigger>
+                <TabsTrigger
+                  className="text-xs rounded-full data-active:bg-background data-active:text-foreground dark:data-active:border-transparent dark:data-active:bg-background dark:data-active:text-foreground"
+                  value="smile"
+                >
+                  Vol Surface
+                </TabsTrigger>
               </TabsList>
+            </div>
 
-              <TabsContent value="price">
+            <div className="overflow-hidden rounded-xl border border-white/5">
+              {/* stats strip (strike · spot · vol · countdown) — padded, while
+                  the chart below runs full-bleed to fill the card width */}
+              <div className="px-4 pt-4">
+                <MarketHeader
+                  oracle={oracle}
+                  points={points}
+                  sel={sel}
+                  atmIv={svi?.atmIv}
+                />
+              </div>
+
+              <TabsContent value="price" className="pt-3 pb-3">
                 <PriceChart points={points} expiry={oracle.expiry} sel={sel} />
               </TabsContent>
 
-              <TabsContent value="smile">
+              <TabsContent value="smile" className="p-4">
                 {svi?.points?.length ? (
                   <>
                     <SviSmileChart
@@ -305,23 +390,21 @@ export default function PredictTerminal({
                       }
                       height={300}
                     />
-                    <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                      Implied volatility by strike from the on-chain SVI surface.
-                      Every price on this page derives from these five parameters —
-                      strikes on the high wings cost more because the market prices
-                      bigger moves there.
+                    <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+                      Implied volatility by strike from the on-chain SVI
+                      surface. Every price on this page derives from these five
+                      parameters — strikes on the high wings cost more because
+                      the market prices bigger moves there.
                     </p>
                   </>
                 ) : (
-                  <div
-                    className="flex h-[300px] items-center justify-center text-sm text-muted-foreground"
-                  >
+                  <div className="flex h-75 items-center justify-center text-sm text-muted-foreground">
                     Loading the vol surface…
                   </div>
                 )}
               </TabsContent>
-            </Tabs>
-          </div>
+            </div>
+          </Tabs>
 
           <MarketTabs
             oracle={oracle}
