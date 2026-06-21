@@ -72,7 +72,7 @@ export function expiryLabel(ms: number): string {
 }
 
 export function marketsToEvents(dtos: PredictMarketDTO[]): PredictEvent[] {
-  return dtos.map(d => {
+  return dtos.map((d) => {
     const isActive = d.status === "active";
     const when = expiryLabel(d.expiry);
 
@@ -205,7 +205,8 @@ export function groupIntoItems(
     }
   }
 
-  const keyOf = (e: PredictEvent) => `${e.predict.asset}|${cadenceOf.get(e.id)}`;
+  const keyOf = (e: PredictEvent) =>
+    `${e.predict.asset}|${cadenceOf.get(e.id)}`;
   const members = new Map<string, PredictEvent[]>();
   for (const e of events) {
     if (!isLiveEvent(e, now) || !cadenceOf.has(e.id)) continue;
