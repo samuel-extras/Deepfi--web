@@ -1,472 +1,555 @@
+/*eslint-disable*/
 "use client";
 
-/**
- * DeepBook Predict — per-user portfolio.
- *
- * Shows both binary (strike + up/down) and range (lower–higher) positions.
- * Dispatches the correct redeem PTB for each type.
- * Also surfaces a "Withdraw to Wallet" button so users can extract their
- * manager balance back to their Sui wallet after redemptions.
- */
-import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useSuiClient } from "@mysten/dapp-kit";
-import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
-import { toast } from "sonner";
-import { usePredictRedeem } from "@/hooks/usePredictRedeem";
-import type { RedeemArgs } from "@/hooks/usePredictRedeem";
-import { buildWithdrawFromManagerTx } from "@/lib/ptb/predict";
-import FundingBar from "@/components/wallet/FundingBar";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import {
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
+import {
+  ChevronRight,
+  Search,
+  Copy,
+  ExternalLink,
+  Inbox,
+  History,
+  ShoppingCart,
+  Briefcase,
+  ArrowUpRight,
+  ArrowDownRight,
+  X,
+  CreditCard,
+  Clock,
+} from "lucide-react";
+import { SearchToolbar } from "@/components/prediction/SearchToolbar";
+import { ActivePositionCard } from "@/components/prediction/ActivePositionCard";
+import { ClosedPositionCard } from "@/components/prediction/ClosedPositionCard";
+import { OpenOrderCard } from "@/components/prediction/OpenOrderCard";
+import { ActivityCard } from "@/components/prediction/ActivityCard";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  usePolymarketPortfolio,
+  PortfolioTimeframe,
+} from "@/hooks/usePolymarketPortfolio";
+import { toast } from "sonner";
+import { usePredictionsBalance } from "@/stores/useBalanceStore";
+import { useTradingSession } from "@/hooks/useTradingSession";
+import { useReferralCode } from "@/stores/useUserProfileStore";
+import { getAvatarEmoji, getAvatarGradient } from "@/lib/avatar";
 
-// ─── types ────────────────────────────────────────────────────────────────────
-interface PortfolioSummary {
-  tradingBalance: number;
-  openExposure: number;
-  redeemableValue: number;
-  realizedPnl: number;
-  unrealizedPnl: number;
-  accountValue: number;
-  openPositions: number;
-  awaitingSettlement: number;
-}
-
-type BinaryPosition = {
-  oracleId: string;
-  asset: string;
-  expiry: number;
-  kind: "binary";
-  strike: number;
-  isUp: boolean;
-  openQty: number;
-  cost: number;
-  markValue: number;
-  unrealizedPnl: number;
-  realizedPnl: number;
-  status: string;
-};
-
-type RangePosition = {
-  oracleId: string;
-  asset: string;
-  expiry: number;
-  kind: "range";
-  lowerStrike: number;
-  higherStrike: number;
-  openQty: number;
-  cost: number;
-  markValue: number;
-  unrealizedPnl: number;
-  realizedPnl: number;
-  status: string;
-};
-
-type Position = BinaryPosition | RangePosition;
-
-interface PortfolioResponse {
-  ok: boolean;
-  managerId: string | null;
-  summary?: PortfolioSummary;
-  positions?: Position[];
-  error?: string;
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-const fmt$ = (n: number) =>
-  n.toLocaleString("en-US", {
+const formatCurrency = (val?: number) => {
+  if (val === undefined || val === null) return "$0.00";
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 2,
-  });
-
-const fmtPnl = (n: number) => {
-  const s = fmt$(n);
-  return n >= 0 ? `+${s}` : s;
+  }).format(val);
 };
 
-function countdown(expiryMs: number): string {
-  const d = expiryMs - Date.now();
-  if (d <= 0) return "expired";
-  const m = Math.floor(d / 60_000);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ${m % 60}m`;
-  return `${Math.floor(h / 24)}d ${h % 24}h`;
-}
+export default function PredictionPortfolioClient() {
+  const [activeTab, setActiveTab] = useState<
+    "Positions" | "Open Orders" | "Activity"
+  >("Positions");
+  const [positionFilter, setPositionFilter] = useState<"Active" | "Closed">(
+    "Active"
+  );
+  const [timeframe, setTimeframe] = useState<PortfolioTimeframe>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
-const STATUS_STYLES: Record<string, string> = {
-  live: "bg-emerald-500/15 text-emerald-400",
-  open: "bg-emerald-500/15 text-emerald-400",
-  settled: "bg-blue-500/15 text-blue-400",
-  redeemable: "bg-amber-500/15 text-amber-400",
-  closed: "bg-muted/20 text-muted-foreground",
-};
+  const { clobClient, initializeTradingSession, isTradingSessionComplete } =
+    useTradingSession();
 
-// ─── component ────────────────────────────────────────────────────────────────
-export default function PredictPortfolio() {
-  const account = useActiveAccount();
-  const owner = account?.address;
-  const client = useSuiClient();
-  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const { redeem, isRedeeming } = usePredictRedeem();
+  const {
+    profile,
+    positions,
+    closedPositions,
+    orders,
+    activity,
+    totalValue,
+    cashBalance: _, // Ignore internal cash balance
+    tradedCount,
+    plHistory,
+    isLoading,
+    error,
+    address: portfolioAddress,
+    refresh,
+  } = usePolymarketPortfolio(timeframe, clobClient);
 
-  const [withdrawAmt, setWithdrawAmt] = useState("");
-  const [isWithdrawing, setIsWithdrawing] = useState(false);
-  const [showWithdraw, setShowWithdraw] = useState(false);
+  const polymarketBalance = usePredictionsBalance();
+  const cashBalance = Number(polymarketBalance) || 0;
 
-  const q = useQuery<PortfolioResponse>({
-    queryKey: ["predict", "portfolio", owner],
-    queryFn: () => fetch(`/api/portfolio?owner=${owner}`).then((r) => r.json()),
-    enabled: !!owner,
-    refetchInterval: 15_000,
-  });
+  const referralCode = useReferralCode();
+  const displayName =
+    referralCode || profile?.name || profile?.pseudonym || "Buddy";
+  const avatarEmoji = useMemo(() => getAvatarEmoji(displayName), [displayName]);
+  const avatarGradient = useMemo(
+    () => getAvatarGradient(displayName),
+    [displayName]
+  );
 
-  const handleWithdraw = async (managerId: string) => {
-    const amt = Number(withdrawAmt);
-    if (!owner || !(amt > 0)) return;
-    setIsWithdrawing(true);
-    try {
-      const tx = buildWithdrawFromManagerTx({
-        managerId,
-        amountDusdc: amt,
-        recipient: owner,
-      });
-      const res = await signAndExecute({ transaction: tx });
-      await client.waitForTransaction({ digest: res.digest });
-      toast.success(
-        `Withdrew ${amt} dUSDC to wallet · ${res.digest.slice(0, 8)}…`,
-      );
-      setWithdrawAmt("");
-      setShowWithdraw(false);
-      void q.refetch();
-    } catch (e) {
-      toast.error(
-        `Withdraw failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`,
-      );
-    } finally {
-      setIsWithdrawing(false);
-    }
+  const handleCopyAddress = (addr: string) => {
+    navigator.clipboard.writeText(addr);
+    toast.success("Address copied to clipboard!");
   };
 
-  if (!owner) {
+  const handleCancelOrder = (order: any) => {
+    openModal("cancelPredictionOrder", {
+      order,
+      onConfirm: async (orderId: string) => {
+        if (!clobClient) return;
+        const toastId = toast.loading("Cancelling order...");
+        try {
+          await clobClient.cancelOrder({ orderID: orderId });
+          toast.success("Order cancelled successfully", { id: toastId });
+          refresh();
+        } catch (err: any) {
+          console.error("Failed to cancel order:", err);
+          toast.error(err.message || "Failed to cancel order", { id: toastId });
+        }
+      },
+    });
+  };
+
+  const openModal = (_id: string, _props?: any) =>
+    toast("Portfolio actions wiring coming soon");
+
+  const handleSellPosition = (pos: any) => {
+    openModal("closePredictionPosition", {
+      position: pos,
+      eventQuestion: pos.title,
+      currentPrice: pos.curPrice ? pos.curPrice * 100 : 50,
+    });
+  };
+
+  const handleSharePosition = (pos: any) => {
+    openModal("sharePredictionPosition", {
+      position: pos,
+    });
+  };
+
+  const handleTransferClick = () => {
+    openModal("transfer", { fromAccount: "predictions" });
+  };
+
+  const filteredData = useMemo(() => {
+    let list: any[] = [];
+    if (activeTab === "Positions") {
+      list = positionFilter === "Active" ? positions : closedPositions;
+    } else if (activeTab === "Open Orders") {
+      list = orders;
+    } else if (activeTab === "Activity") {
+      list = activity;
+    }
+
+    if (!searchQuery) return list;
+    const query = searchQuery.toLowerCase();
+    return list.filter((item: any) =>
+      (item.title || item.eventSlug || item.asset || "")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [
+    activeTab,
+    positions,
+    closedPositions,
+    orders,
+    activity,
+    positionFilter,
+    searchQuery,
+  ]);
+
+  const stats = useMemo(() => {
+    const totalPosValue = positions.reduce(
+      (sum, p) => sum + (p.currentValue || 0),
+      0
+    );
+    const biggestWin =
+      closedPositions.length > 0
+        ? Math.max(...closedPositions.map(p => p.realizedPnl || 0))
+        : 0;
+
+    return {
+      totalPosValue,
+      biggestWin: biggestWin > 0 ? formatCurrency(biggestWin) : "—",
+      trades: tradedCount || positions.length + closedPositions.length,
+    };
+  }, [positions, closedPositions, tradedCount]);
+
+  if (isLoading) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-6">
-        <h1 className="mb-4 text-2xl font-semibold">My Predict Portfolio</h1>
-        <FundingBar />
-        <div className="rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">
-          Connect your wallet to view your positions.
+      <div className="min-h-screen bg-[#121417] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-[#02DA8B] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[#6B7280] text-sm animate-pulse">
+            Syncing Portfolio...
+          </p>
         </div>
       </div>
     );
   }
 
-  const data = q.data;
-  const summary = data?.summary;
-  const positions = data?.positions ?? [];
-  const managerId = data?.managerId;
-
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6">
-      <div className="mb-5 flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">My Predict Portfolio</h1>
-          {managerId ? (
-            <p className="mt-1 text-xs text-muted-foreground font-mono">
-              Manager {managerId.slice(0, 10)}…{managerId.slice(-6)}
+    <div className="min-h-screen bg-[#121417] text-white selection:bg-[#02DA8B]/30 font-sans">
+      {/* Top Navigation / Breadcrumbs */}
+      <div className="container mx-auto px-4 md:px-6 pt-4 md:pt-6 flex flex-col lg:flex-row justify-between items-start gap-6">
+        <div className="space-y-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 text-[10px] text-[#A9A9A9] font-bold uppercase tracking-[0.2em]">
+            <Link
+              href="/prediction/events"
+              className="hover:text-[#02DA8B] transition-colors"
+            >
+              Prediction Markets
+            </Link>
+            <ChevronRight className="h-3 w-3 opacity-30" />
+            <span className="text-white opacity-40">Portfolio</span>
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
+              Portfolio
+            </h1>
+            <p className="text-[#6B7280] text-xs md:text-sm font-medium">
+              View your portfolio performance and open positions
             </p>
-          ) : null}
+          </div>
         </div>
-        {q.isFetching && (
-          <span className="text-xs text-muted-foreground animate-pulse">
-            Refreshing…
-          </span>
-        )}
+
+        {/* Top Right Card */}
+        <div className="w-full lg:w-auto bg-[#1E2024]/40 border border-white/5 rounded-xl p-5 md:p-6 min-w-full lg:min-w-[340px] backdrop-blur-xl">
+          <div className="flex justify-between items-center mb-6">
+            <div className="space-y-1">
+              <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-[0.15em]">
+                Total Portfolio
+              </div>
+              <div className="text-2xl font-bold text-[#02DA8B] tabular-nums tracking-tighter">
+                {formatCurrency(totalValue)}
+              </div>
+            </div>
+            <div className="text-right space-y-1">
+              <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-[0.15em]">
+                Available Cash
+              </div>
+              <div className="text-2xl font-bold text-white tabular-nums tracking-tighter">
+                {formatCurrency(cashBalance)}
+              </div>
+            </div>
+          </div>
+          <Button
+            onClick={() =>
+              !isTradingSessionComplete
+                ? initializeTradingSession()
+                : handleTransferClick()
+            }
+            className="w-full bg-[#02DA8B] hover:bg-[#02DA8B]/90 text-black border-none font-bold h-10 text-xs transition-all active:scale-[0.98]"
+          >
+            {isTradingSessionComplete ? "Transfer Funds" : "Initialize Session"}
+          </Button>
+        </div>
       </div>
 
-      <FundingBar />
+      <div className="container mx-auto px-4 md:px-6 mt-8 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+          {/* Left Section: User Profile & Quick Stats */}
+          <div className="lg:col-span-4 space-y-8">
+            <div className="flex items-center gap-4 group">
+              <div
+                className="h-14 w-14 rounded-xl flex items-center justify-center text-2xl shadow-lg transition-transform group-hover:scale-105"
+                style={{
+                  background: `linear-gradient(135deg, ${avatarGradient[0]}, ${avatarGradient[1]})`,
+                  boxShadow: `0 4px 14px ${avatarGradient[0]}25`,
+                }}
+              >
+                {avatarEmoji}
+              </div>
+              <div className="space-y-1">
+                <div className="text-xl font-bold text-white tracking-tight">
+                  {displayName}
+                </div>
+                <div className="flex items-center gap-2 text-[#6B7280] text-[10px] font-mono bg-white/5 px-2 py-1 rounded-md border border-white/5">
+                  <span className="opacity-80">
+                    {portfolioAddress
+                      ? `${portfolioAddress.slice(0, 6)}...${portfolioAddress.slice(-4)}`
+                      : "0x2D66...469d"}
+                  </span>
+                  <div className="flex items-center gap-1.5 ml-1.5 border-l border-white/10 pl-1.5">
+                    <button
+                      className="hover:text-white cursor-pointer transition-colors p-0.5"
+                      title="Copy Address"
+                      onClick={() =>
+                        navigator.clipboard.writeText(portfolioAddress || "")
+                      }
+                    >
+                      <Copy className="h-3 w-3" />
+                    </button>
+                    <a
+                      href={`https://polygonscan.com/address/${portfolioAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-white transition-colors p-0.5"
+                      title="View on Explorer"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      {/* account stats */}
-      {summary ? (
-        <>
-          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard
-              label="Account value"
-              value={fmt$(summary.accountValue)}
-            />
-            <StatCard
-              label="Trading balance"
-              value={fmt$(summary.tradingBalance)}
-              hint="withdrawable"
-            />
-            <StatCard
-              label="Unrealized PnL"
-              value={fmtPnl(summary.unrealizedPnl)}
-              color={summary.unrealizedPnl >= 0 ? "emerald" : "rose"}
-            />
-            <StatCard
-              label="Realized PnL"
-              value={fmtPnl(summary.realizedPnl)}
-              color={summary.realizedPnl >= 0 ? "emerald" : "rose"}
-            />
-            <StatCard
-              label="Open exposure"
-              value={fmt$(summary.openExposure)}
-            />
-            <StatCard
-              label="Redeemable"
-              value={fmt$(summary.redeemableValue)}
-              color="amber"
-            />
-            <StatCard
-              label="Open positions"
-              value={String(summary.openPositions)}
-            />
-            <StatCard
-              label="Awaiting settlement"
-              value={String(summary.awaitingSettlement)}
-            />
+            <div className="grid grid-cols-3 gap-4 border-y border-white/5 py-6">
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-widest opacity-60">
+                  Value
+                </div>
+                <div className="text-xl font-bold text-white tabular-nums">
+                  {formatCurrency(stats.totalPosValue)}
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-widest opacity-60">
+                  Biggest Win
+                </div>
+                <div className="text-xl font-bold text-white tabular-nums">
+                  {stats.biggestWin}
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-widest opacity-60">
+                  Trades
+                </div>
+                <div className="text-xl font-bold text-white tabular-nums">
+                  {stats.trades}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Withdraw to wallet — only shown when there's a balance to pull out */}
-          {managerId && summary.tradingBalance > 0 ? (
-            <div className="mb-5">
-              {showWithdraw ? (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-600/30 bg-emerald-500/5 p-3">
-                  <span className="text-xs font-medium text-foreground">
-                    Withdraw dUSDC to wallet
-                  </span>
-                  <input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={withdrawAmt}
-                    onChange={(e) => setWithdrawAmt(e.target.value)}
-                    placeholder={`max ${summary.tradingBalance.toFixed(2)}`}
-                    className="w-28 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground outline-none focus:border-emerald-500"
+          {/* Right Section: P&L Chart */}
+          <div className="lg:col-span-8 bg-[#1E2024]/20 border border-white/5 rounded-2xl p-5 md:p-6 backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-6">
+              <div className="space-y-0.5">
+                <div className="text-[9px] text-[#6B7280] font-bold uppercase tracking-widest">
+                  Profit / Loss
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <div
+                    className={cn(
+                      "text-3xl font-bold tracking-tighter",
+                      (plHistory[plHistory.length - 1]?.value || 0) > 0.004
+                        ? "text-[#02DA8B]"
+                        : (plHistory[plHistory.length - 1]?.value || 0) < -0.004
+                          ? "text-red-500"
+                          : "text-[#6B7280]"
+                    )}
+                  >
+                    {(plHistory[plHistory.length - 1]?.value || 0) > 0.004
+                      ? "+"
+                      : ""}
+                    {formatCurrency(
+                      plHistory[plHistory.length - 1]?.value || 0
+                    )}
+                  </div>
+                  <div className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">
+                    Past 24H
+                  </div>
+                </div>
+              </div>
+              <div className="flex bg-white/5 p-1 rounded-lg border border-white/5 shrink-0">
+                {(["24H", "7D", "30D", "ALL"] as PortfolioTimeframe[]).map(
+                  tf => (
+                    <button
+                      key={tf}
+                      onClick={() => setTimeframe(tf as PortfolioTimeframe)}
+                      className={cn(
+                        "px-3 py-1.5 text-[10px] font-semibold rounded-md transition-all",
+                        timeframe === tf
+                          ? "bg-[#2D3134] text-white shadow-sm"
+                          : "text-[#6B7280] hover:text-white"
+                      )}
+                    >
+                      {tf}
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+
+            <div className="h-[160px] w-full mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={plHistory}>
+                  <defs>
+                    <linearGradient id="colorPl" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#02DA8B" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#02DA8B" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip
+                    cursor={{ stroke: "#FFFFFF10", strokeWidth: 1 }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-[#121417]/95 border border-white/10 p-2 rounded-lg shadow-xl backdrop-blur-md">
+                            <div
+                              className={cn(
+                                "text-xs font-bold tabular-nums",
+                                Number(payload[0].value) >= 0
+                                  ? "text-[#02DA8B]"
+                                  : "text-red-500"
+                              )}
+                            >
+                              {formatCurrency(Number(payload[0].value))}
+                            </div>
+                            <div className="text-[9px] text-[#6B7280] font-bold mt-0.5">
+                              {payload[0].payload.time}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
                   />
-                  <button
-                    onClick={() => void handleWithdraw(managerId)}
-                    disabled={isWithdrawing || !(Number(withdrawAmt) > 0)}
-                    className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                  >
-                    {isWithdrawing ? "…" : "Confirm"}
-                  </button>
-                  <button
-                    onClick={() => setShowWithdraw(false)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#02DA8B"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorPl)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section: Tabs & List */}
+        <div className="mt-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 mb-6">
+            <div className="flex gap-8">
+              {(["Positions", "Open Orders", "Activity"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab as any)}
+                  className={cn(
+                    "pb-3 text-sm font-medium transition-all relative",
+                    activeTab === tab
+                      ? "text-[#02DA8B]"
+                      : "text-[#6B7280] hover:text-white"
+                  )}
+                >
+                  {tab}
+                  {activeTab === tab && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#02DA8B]" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {activeTab !== "Open Orders" && (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+              {activeTab === "Positions" ? (
+                <div className="flex bg-[#1E2024]/50 p-1 rounded-lg border border-white/5 w-fit">
+                  {(["Active", "Closed"] as const).map(filter => (
+                    <button
+                      key={filter}
+                      onClick={() => setPositionFilter(filter as any)}
+                      className={cn(
+                        "px-6 py-1.5 text-[9px] font-bold rounded-md transition-all",
+                        positionFilter === filter
+                          ? "bg-[#02DA8B] text-[#081a12]"
+                          : "text-[#6B7280] hover:text-white"
+                      )}
+                    >
+                      {filter}
+                    </button>
+                  ))}
                 </div>
               ) : (
-                <button
-                  onClick={() => {
-                    setWithdrawAmt(summary.tradingBalance.toFixed(2));
-                    setShowWithdraw(true);
-                  }}
-                  className="rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-emerald-600/50 hover:text-emerald-400"
-                >
-                  ↑ Withdraw {fmt$(summary.tradingBalance)} to wallet
-                </button>
+                <div /> // Spacer to keep search on the right
               )}
+
+              <SearchToolbar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                onClearSearch={() => setSearchQuery("")}
+                showFilter={false}
+                showViewMode={false}
+                placeholder={`Search ${activeTab.toLowerCase()}...`}
+              />
+            </div>
+          )}
+
+          {filteredData.length === 0 ? (
+            <div className=" border border-white/5 rounded-2xl p-12 md:p-20 flex flex-col items-center justify-center text-center backdrop-blur-[1px]">
+              <div className="h-16 w-16 bg-[#02DA8B]/5 rounded-full flex items-center justify-center mb-6 border border-[#02DA8B]/10">
+                <Inbox className="h-8 w-8 text-[#02DA8B] opacity-20" />
+              </div>
+              <div className="space-y-3 mb-8">
+                <h3 className="text-lg font-bold text-white tracking-tight">
+                  No {activeTab.toLowerCase()} found
+                </h3>
+                <p className="text-[#6B7280] font-medium text-xs max-w-xs mx-auto leading-relaxed">
+                  {searchQuery
+                    ? "No results found matching your search."
+                    : `You don't have any ${activeTab.toLowerCase()} yet.`}
+                </p>
+              </div>
+              <Link href="/prediction/events" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-[#02DA8B] hover:bg-[#02DA8B]/90 text-black border-none px-8 h-10 text-xs font-bold transition-all active:scale-[0.98]">
+                  Browse Markets
+                </Button>
+              </Link>
             </div>
           ) : (
-            <div className="mb-5" />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {activeTab === "Positions" &&
+                filteredData.map((pos: any, i: number) =>
+                  positionFilter === "Active" ? (
+                    <ActivePositionCard
+                      key={i}
+                      pos={pos}
+                      formatCurrency={formatCurrency}
+                      onSell={handleSellPosition}
+                      onShare={handleSharePosition}
+                    />
+                  ) : (
+                    <ClosedPositionCard
+                      key={i}
+                      pos={pos}
+                      formatCurrency={formatCurrency}
+                      onShare={handleSharePosition}
+                    />
+                  )
+                )}
+
+              {activeTab === "Open Orders" &&
+                filteredData.map((order: any, i: number) => (
+                  <OpenOrderCard
+                    key={i}
+                    order={order}
+                    index={i}
+                    formatCurrency={formatCurrency}
+                    onCancel={handleCancelOrder}
+                  />
+                ))}
+
+              {activeTab === "Activity" &&
+                filteredData.map((act: any, i: number) => (
+                  <ActivityCard
+                    key={i}
+                    act={act}
+                    formatCurrency={formatCurrency}
+                  />
+                ))}
+            </div>
           )}
-        </>
-      ) : q.isLoading ? (
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 animate-pulse rounded-lg border border-border bg-muted/10"
-            />
-          ))}
         </div>
-      ) : data?.managerId === null ? (
-        <div className="mb-6 rounded-lg border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-          No PredictManager found. Mint a position to create one automatically.
-        </div>
-      ) : null}
-
-      {/* position list */}
-      {positions.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/5 text-left text-xs text-muted-foreground">
-                <th className="px-4 py-3">Asset / Type</th>
-                <th className="px-4 py-3">Strike / Range</th>
-                <th className="px-4 py-3">Expiry</th>
-                <th className="px-4 py-3">Cost</th>
-                <th className="px-4 py-3">Mark</th>
-                <th className="px-4 py-3">PnL</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {positions.map((p, i) => (
-                <PositionRow
-                  key={i}
-                  position={p}
-                  managerId={managerId}
-                  isRedeeming={isRedeeming}
-                  onRedeem={redeem}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : summary && positions.length === 0 ? (
-        <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          No open positions. Head to{" "}
-          <Link href="/prediction" className="text-emerald-400 hover:underline">
-            Markets
-          </Link>{" "}
-          to mint one.
-        </div>
-      ) : null}
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Positions update every ~15 s. Not financial advice. Testnet only.
-      </p>
-    </div>
-  );
-}
-
-// ─── position row ─────────────────────────────────────────────────────────────
-function PositionRow({
-  position: p,
-  managerId,
-  isRedeeming,
-  onRedeem,
-}: {
-  position: Position;
-  managerId: string | null | undefined;
-  isRedeeming: boolean;
-  onRedeem: (args: RedeemArgs) => void;
-}) {
-  const canRedeem =
-    managerId && (p.status === "settled" || p.status === "redeemable");
-
-  const strikeCell =
-    p.kind === "range" ? (
-      <span className="font-mono text-xs">
-        ${p.lowerStrike.toLocaleString()} – ${p.higherStrike.toLocaleString()}
-      </span>
-    ) : (
-      <span className="font-mono text-xs">${p.strike.toLocaleString()}</span>
-    );
-
-  const typeLabel =
-    p.kind === "range" ? "Range" : p.isUp ? "↑ Up binary" : "↓ Down binary";
-
-  const typeColor =
-    p.kind === "range"
-      ? "text-muted-foreground"
-      : p.isUp
-        ? "text-emerald-400"
-        : "text-rose-400";
-
-  const handleRedeem = () => {
-    if (!managerId) return;
-    if (p.kind === "range") {
-      onRedeem({
-        kind: "range",
-        managerId,
-        oracleId: p.oracleId,
-        expiryMs: p.expiry,
-        lowerUsd: p.lowerStrike,
-        higherUsd: p.higherStrike,
-        quantity: p.openQty,
-      });
-    } else {
-      onRedeem({
-        kind: "binary",
-        managerId,
-        oracleId: p.oracleId,
-        expiryMs: p.expiry,
-        strikeUsd: p.strike,
-        isUp: p.isUp,
-        quantity: p.openQty,
-      });
-    }
-  };
-
-  return (
-    <tr className="text-sm transition-colors hover:bg-muted/5">
-      <td className="px-4 py-3">
-        <div className="font-medium">{p.asset}</div>
-        <div className={`text-[11px] ${typeColor}`}>{typeLabel}</div>
-      </td>
-      <td className="px-4 py-3">{strikeCell}</td>
-      <td className="px-4 py-3 text-xs text-muted-foreground">
-        {countdown(p.expiry)}
-      </td>
-      <td className="px-4 py-3 text-xs">{fmt$(p.cost)}</td>
-      <td className="px-4 py-3 text-xs">{fmt$(p.markValue)}</td>
-      <td
-        className={`px-4 py-3 text-xs font-medium ${
-          p.unrealizedPnl >= 0 ? "text-emerald-400" : "text-rose-400"
-        }`}
-      >
-        {fmtPnl(p.unrealizedPnl)}
-      </td>
-      <td className="px-4 py-3">
-        <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
-            STATUS_STYLES[p.status] ?? "bg-muted/20 text-muted-foreground"
-          }`}
-        >
-          {p.status}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-right">
-        {canRedeem ? (
-          <button
-            disabled={isRedeeming}
-            onClick={handleRedeem}
-            className="rounded-md bg-emerald-600/80 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-          >
-            Redeem
-          </button>
-        ) : null}
-      </td>
-    </tr>
-  );
-}
-
-// ─── StatCard ─────────────────────────────────────────────────────────────────
-function StatCard({
-  label,
-  value,
-  hint,
-  color,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  color?: "emerald" | "rose" | "amber";
-}) {
-  const colorClass =
-    color === "emerald"
-      ? "text-emerald-400"
-      : color === "rose"
-        ? "text-rose-400"
-        : color === "amber"
-          ? "text-amber-400"
-          : "text-foreground";
-  return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`mt-1 text-base font-semibold ${colorClass}`}>
-        {value}
       </div>
-      {hint ? (
-        <div className="mt-0.5 text-[10px] text-muted-foreground">{hint}</div>
-      ) : null}
     </div>
   );
 }

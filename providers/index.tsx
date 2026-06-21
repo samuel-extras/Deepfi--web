@@ -6,11 +6,13 @@ import { WagmiProvider } from "./WagmiProvider";
 import { InitProvider } from "./InitProvider";
 import { QueryProvider } from "./queryProvider";
 import { SuiProvider } from "./SuiProvider";
+import { OracleLiveStream } from "./OracleLiveStream";
 
 const Providers = ({ children }: { children: ReactNode }) => {
   return (
     <WagmiProvider>
         <QueryProvider>
+          <OracleLiveStream />
           <SuiProvider>
             <NuqsAdapter>
               <InitProvider>{children}</InitProvider>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   BitcoinIcon,
   EthereumIcon,
@@ -6,7 +6,25 @@ import {
   TetherUSDIcon,
   USDCIcon,
 } from "@/components/icons/token-icons";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import formatSymbol from "@/lib/formatSymbol";
+// Local crypto images downloaded into /assets. `@/*` → repo root, and Next types
+// png imports (next/image-types) so each yields a hashed StaticImageData url.
+import suiImg from "@/assets/sui.png";
+import usdcImg from "@/assets/usdc.png";
+import usdtImg from "@/assets/usdt.png";
+import deepImg from "@/assets/deep.png";
+import walImg from "@/assets/wal.png";
+
+/** Downloaded asset images, keyed by uppercase base symbol — these win over CDN. */
+const LOCAL_IMAGES: Record<string, string> = {
+  SUI: suiImg.src,
+  USDC: usdcImg.src,
+  "USDC.E": usdcImg.src,
+  USDT: usdtImg.src,
+  DEEP: deepImg.src,
+  WAL: walImg.src,
+};
 
 interface TokenIconProps {
   symbol: string;
@@ -21,15 +39,17 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
   isSpot = false,
   logoUrl,
 }) => {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const [imgError, setImgError] = useState(false);
-  const formattedSymbol = formatSymbol(symbol);
+  const base = (symbol?.split("/")[0] ?? symbol).toUpperCase();
+  // Exact match, else any *USDC / *USDT variant reuses the stablecoin image.
+  const localSrc =
+    LOCAL_IMAGES[base] ??
+    (base.endsWith("USDC")
+      ? usdcImg.src
+      : base.endsWith("USDT")
+        ? usdtImg.src
+        : undefined);
 
-  // If a custom logo URL is provided, try it first
-  if (logoUrl) {
-    return <ExternalLogoIcon url={logoUrl} symbol={symbol} size={size} />;
-  }
-
+  // Crisp built-in vectors (no network) when there's no downloaded override.
   const iconMap: Record<string, React.ReactNode> = {
     BTC: <BitcoinIcon size={size} />,
     ETH: <EthereumIcon size={size} />,
@@ -38,79 +58,27 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
     USDC: <USDCIcon size={size} />,
     "USDC.e": <USDCIcon size={size} />,
   };
-
-  if (iconMap[symbol]) {
+  if (!localSrc && !logoUrl && iconMap[symbol]) {
     return <>{iconMap[symbol]}</>;
   }
 
-  const imgLogo = getImagePath(symbol, isSpot);
-  const imgSrc = `https://app.deepbook.xyz/coins/${imgLogo}.svg`;
+  // Render every image (downloaded > explicit logo > DeepBook CDN) through the
+  // shadcn Avatar — it handles load/error and falls back to a monogram for free.
+  const src =
+    localSrc ??
+    logoUrl ??
+    `https://app.deepbook.xyz/coins/${getImagePath(symbol, isSpot)}.svg`;
 
   return (
-    <>
-      {(!imgLoaded || imgError) && (
-        <TokenMonogram symbol={formattedSymbol} size={size} />
-      )}
-
-      {!imgError && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imgSrc}
-          width={size}
-          height={size}
-          alt={symbol}
-          className="rounded-full"
-          style={{ display: imgLoaded ? "block" : "none" }}
-          onLoad={() => setImgLoaded(true)}
-          onError={() => setImgError(true)}
-        />
-      )}
-    </>
-  );
-};
-
-const ExternalLogoIcon: React.FC<{
-  url: string;
-  symbol: string;
-  size: number;
-}> = ({ url, symbol, size }) => {
-  const [error, setError] = useState(false);
-  const formattedSymbol = formatSymbol(symbol);
-
-  if (error) {
-    return <TokenMonogram symbol={formattedSymbol} size={size} />;
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      width={size}
-      height={size}
-      alt={symbol}
-      className="rounded-full"
-      onError={() => setError(true)}
-    />
-  );
-};
-
-const TokenMonogram: React.FC<{ symbol: string; size: number }> = ({
-  symbol,
-  size,
-}) => {
-  const sizeClass =
-    size === 24 ? "w-6 h-6" : size === 32 ? "w-8 h-8" : "w-12 h-12";
-  const textClass =
-    size === 24 ? "text-[10px]" : size === 32 ? "text-xs" : "text-sm";
-
-  return (
-    <div
-      className={`${sizeClass} rounded-full bg-[#1F1F1F] flex items-center justify-center border border-border`}
-    >
-      <span className={`text-white ${textClass} font-bold`}>
-        {symbol.slice(0, 2).toUpperCase()}
-      </span>
-    </div>
+    <Avatar className="shrink-0" style={{ width: size, height: size }}>
+      <AvatarImage src={src} alt={symbol} className="object-contain" />
+      <AvatarFallback
+        className="bg-[#1F1F1F] font-bold text-white"
+        style={{ fontSize: Math.max(9, Math.round(size * 0.4)) }}
+      >
+        {formatSymbol(symbol).slice(0, 2).toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
   );
 };
 

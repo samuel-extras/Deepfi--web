@@ -9,6 +9,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { DEV_ADDRESS } from "@/lib/sui/network";
+import { TokenIcon } from "@/components/ui/token-icon";
 
 type MarginResp = {
   ok: boolean;
@@ -73,7 +74,10 @@ export default function MarginPanels() {
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {(m?.pools ?? []).map(p => (
           <div key={p.asset} className="rounded-lg border border-border bg-card p-4">
-            <div className="text-xs text-muted-foreground">{p.asset} supply</div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <TokenIcon symbol={p.asset} size={16} />
+              {p.asset} supply
+            </div>
             <div className="mt-1 text-lg font-semibold text-foreground">{num(p.supply, 2)}</div>
             <div className="text-[10px] text-muted-foreground">available to borrow</div>
           </div>
@@ -107,7 +111,12 @@ export default function MarginPanels() {
                 <tbody>
                   {myPositions.map(p => (
                     <tr key={p.margin_manager_id} className="border-t border-border">
-                      <td className="px-4 py-2 text-foreground">{p.base_asset_symbol}/{p.quote_asset_symbol}</td>
+                      <td className="px-4 py-2 text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <TokenIcon symbol={p.base_asset_symbol} size={18} />
+                          {p.base_asset_symbol}/{p.quote_asset_symbol}
+                        </span>
+                      </td>
                       <td className="px-4 py-2 text-foreground">{usd(p.net_value_usd)}</td>
                       <td className="px-4 py-2 text-foreground">{usd(p.total_debt_usd)}</td>
                       <td className="px-4 py-2"><Risk r={p.risk_ratio} /></td>
@@ -139,7 +148,12 @@ export default function MarginPanels() {
                 <tbody>
                   {atRisk.map(s => (
                     <tr key={s.margin_manager_id} className="border-t border-border">
-                      <td className="px-4 py-2 text-foreground">{s.base_asset_symbol}/{s.quote_asset_symbol}</td>
+                      <td className="px-4 py-2 text-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <TokenIcon symbol={s.base_asset_symbol} size={18} />
+                          {s.base_asset_symbol}/{s.quote_asset_symbol}
+                        </span>
+                      </td>
                       <td className="px-4 py-2"><Risk r={Number(s.risk_ratio)} /></td>
                       <td className="px-4 py-2 text-muted-foreground">{short(s.margin_manager_id)}</td>
                     </tr>

@@ -28,8 +28,11 @@ const toDTO = (o: OracleRow) => ({
 export async function GET() {
   try {
     const rows = await indexer.oracles();
+    const now = Date.now();
+    // Drop "zombie" oracles the indexer still marks active but whose expiry has
+    // already passed (dead markets — their price feed has stopped ticking).
     const active = rows
-      .filter((o) => o.status === "active")
+      .filter((o) => o.status === "active" && o.expiry > now)
       .sort((a, b) => a.expiry - b.expiry)
       .map(toDTO);
     const settled = rows

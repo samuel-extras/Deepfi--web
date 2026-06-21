@@ -1,6 +1,5 @@
-// Carried from dex prediction/events EventsHeader.
-// Demo adaptation: the live balance store + transfer modal are replaced with a
-// static balance prop and a no-op transfer handler. Markup is verbatim.
+// Carried from dex prediction/events EventsHeader. Presentational — the parent
+// passes the real wallet balance (the user's dUSDC) and a transfer handler.
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ interface EventsHeaderProps {
 }
 
 export function EventsHeader({
-  balance = "$1,250.00",
+  balance = "$0.00",
   onTransfer,
 }: EventsHeaderProps) {
   const balanceValue = balance;

@@ -94,7 +94,8 @@ export function ConnectWalletDialog({
 
           {!googleEnabled ? (
             <p className="text-center text-[11px] text-muted-foreground">
-              Google sign-in isn’t configured yet (NEXT_PUBLIC_GOOGLE_CLIENT_ID).
+              Google sign-in isn’t configured yet (NEXT_PUBLIC_GOOGLE_CLIENT_ID +
+              NEXT_PUBLIC_ENOKI_API_KEY).
             </p>
           ) : null}
           {error ? (

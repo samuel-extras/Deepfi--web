@@ -19,8 +19,11 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { BitcoinIcon } from "@/components/icons/token-icons";
-import { useBetParams } from "@/hooks/useBetParams";
-import type { Direction } from "@/components/prediction/terminal/types";
+import { useBetStore } from "@/stores/useBetStore";
+import type {
+  Direction,
+  OracleDTO,
+} from "@/components/prediction/terminal/types";
 
 interface EventCardProps {
   event: PredictEvent;
@@ -60,7 +63,18 @@ export function EventCard({
 }: EventCardProps) {
   const p = event.predict;
   const isActive = p.status === "active";
-  const { open: openBet } = useBetParams();
+  // Stable action — selecting only `open` means the card never re-renders when
+  // the modal opens/closes. Pass the full oracle so the modal renders instantly.
+  const openBet = useBetStore((s) => s.open);
+  const betOracle: OracleDTO = {
+    oracleId: p.oracleId,
+    asset: p.asset,
+    expiry: p.expiry,
+    status: p.status,
+    minStrike: p.minStrike,
+    tickSize: p.tickSize,
+    settlementPrice: p.settlementPrice,
+  };
 
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -156,7 +170,7 @@ export function EventCard({
                       variant="success"
                       size="sm"
                       className="rounded-l-full! "
-                      onClick={() => openBet(p.oracleId, yesDir)}
+                      onClick={() => openBet(betOracle, yesDir)}
                     >
                       Yes
                     </Button>
@@ -165,7 +179,7 @@ export function EventCard({
                       variant="destructive"
                       size="sm"
                       className="-ml-px px-3"
-                      onClick={() => openBet(p.oracleId, noDir)}
+                      onClick={() => openBet(betOracle, noDir)}
                     >
                       No
                     </Button>

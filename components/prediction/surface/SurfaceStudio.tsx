@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
+import { OracleLiveBadge } from "@/components/prediction/OracleLiveBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Empty,
@@ -182,9 +183,12 @@ export default function SurfaceStudio() {
             active {expiries[0]?.asset ?? "BTC"} market{E === 1 ? "" : "s"}.
           </p>
         </div>
-        <Badge variant={arbFree ? "success" : "destructive"}>
-          {arbFree ? "Arbitrage-free ✓" : "Arb violations"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <OracleLiveBadge />
+          <Badge variant={arbFree ? "success" : "destructive"}>
+            {arbFree ? "Arbitrage-free ✓" : "Arb violations"}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">

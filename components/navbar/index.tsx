@@ -9,6 +9,7 @@ import { CompetitionIcon, EarnIcon, LogoIcon } from "@/components/icons";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { usePrivy } from "@privy-io/react-auth";
 import UserMenu from "./UserMenu";
+import { WalletBalanceMenu } from "./WalletBalanceMenu";
 import { useDisconnect } from "wagmi";
 import { useDisconnectWallet } from "@mysten/dapp-kit";
 import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
@@ -359,11 +360,14 @@ export default function Navbar() {
               }
             />
           ) : (
-            <UserMenu
-              email={userInfo.email}
-              walletAddress={userInfo.walletAddress}
-              onLogout={handleLogout}
-            />
+            <>
+              <WalletBalanceMenu />
+              <UserMenu
+                email={userInfo.email}
+                walletAddress={userInfo.walletAddress}
+                onLogout={handleLogout}
+              />
+            </>
           )}
           <SettingsDropdown
             settings={settings}

@@ -30,6 +30,8 @@ export type PredictPayload = {
   asset: string;
   expiry: number;
   status: string;
+  minStrike: number;
+  tickSize: number;
   atmStrike: number | null;
   aboveProb: number | null; // 0..1
   atmIv: number | null;
@@ -120,6 +122,8 @@ export function marketsToEvents(dtos: PredictMarketDTO[]): PredictEvent[] {
         asset: d.asset,
         expiry: d.expiry,
         status: d.status,
+        minStrike: d.minStrike,
+        tickSize: d.tickSize,
         atmStrike: d.atmStrike,
         aboveProb: d.aboveProb,
         atmIv: d.atmIv,

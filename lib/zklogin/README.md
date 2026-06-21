@@ -13,7 +13,8 @@ in-app ephemeral key, so there's no wallet popup and users never need SUI.
    - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` — Google OAuth **Web** client. Register redirect URIs
      `http://localhost:3140/auth/callback` (+ `<prod>/auth/callback`) and matching JS origins.
    - `ZKLOGIN_SALT_SECRET` — random 32+ bytes (`openssl rand -hex 32`). SERVER ONLY.
-   - `NEXT_PUBLIC_ZKLOGIN_PROVER_URL` — defaults to Mysten's public prover.
+   - `NEXT_PUBLIC_ZKLOGIN_PROVER_URL` — network-matched Mysten prover (testnet/mainnet
+     `prover.mystenlabs.com`, devnet `prover-dev`). Mismatch → on-chain "Groth16 proof verify failed".
    - `SPONSOR_PRIVATE_KEY` — a **funded testnet** keypair (`suiprivkey…`).
 2. Until `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set, the Google button shows a hint;
    a normal wallet (Slush) keeps working.

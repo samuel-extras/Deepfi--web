@@ -8,7 +8,7 @@ import { withDefaultMetadata } from "@/lib/metadata";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Providers from "@/providers";
 import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/components/theme-provider";
+// import { ThemeProvider } from "@/components/theme-provider";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -46,26 +46,25 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider
+        {/* <ThemeProvider
           attribute="class"
           defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
-        >
-          <Providers>
-            <TooltipProvider>
-              <Navbar />
-              <main className="min-h-[calc(100vh-3rem)]">
-                {children}
-                {/* <div className="absolute min-h-svh h-full inset-0 -z-10 items-center px-5 py-24 bg-radial-[125%_125%_at_50%_10%] from-transparent from-50% to-violet-800" /> */}
-              </main>
-              <div id="modal-root" />
-              <ModalRoot />
-              <Toaster />
-            </TooltipProvider>
-          </Providers>{" "}
-        </ThemeProvider>
-
+        > */}
+        <Providers>
+          <TooltipProvider>
+            <Navbar />
+            <main className="min-h-[calc(100vh-3rem)] ">
+              {children}
+              {/* <div className="absolute min-h-svh h-full inset-0 -z-10 items-center px-5 py-24 bg-radial-[125%_125%_at_50%_10%] from-transparent from-50% to-violet-800" /> */}
+            </main>
+            <div id="modal-root" />
+            <ModalRoot />
+            <Toaster />
+          </TooltipProvider>
+        </Providers>{" "}
+        {/* </ThemeProvider> */}
         {/* <div className="absolute top-0 -z-2 h-screen w-screen bg-radial-[ellipse_80%_80%_at_50%_-20%] from-[#8602f2]/40 to-transparent" /> */}
       </body>
     </html>

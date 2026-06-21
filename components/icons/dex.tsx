@@ -4,4 +4,4 @@
     <path d="M12 39 H67 A11 11 0 0 1 67 61 H12 Z"></path>
     <path d="M12 68 H44 A11 11 0 0 1 44 90 H12 Z"></path>
   </g>
-</svg>
+</svg>;

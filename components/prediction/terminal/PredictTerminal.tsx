@@ -139,6 +139,19 @@ export default function PredictTerminal({
   const points = useMemo(() => pricesQ.data?.points ?? [], [pricesQ.data]);
   const spot = pricesQ.data?.spot ?? null;
 
+  // Some "active" oracles have a dead price feed (testnet feeders stall). If the
+  // last tick is old, the chart is correctly frozen — say so instead of looking
+  // broken. Recomputed on each 3s refetch.
+  const lastTickT = points.at(-1)?.t ?? 0;
+  const tickAgeMs = lastTickT ? Date.now() - lastTickT : 0;
+  const staleTape = lastTickT > 0 && tickAgeMs > 15 * 60_000;
+  const staleAgo = (() => {
+    const m = Math.floor(tickAgeMs / 60_000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `${h}h ago` : `${Math.floor(h / 24)}d ago`;
+  })();
+
   // page header tracks the *selected* oracle so it follows rail changes (incl.
   // past markets). For the route's own oracle we keep the server `detail`, which
   // carries the richer settled / SVI fields.
@@ -369,6 +382,12 @@ export default function PredictTerminal({
               </div>
 
               <TabsContent value="price" className="pt-3 pb-3">
+                {staleTape ? (
+                  <div className="mx-4 mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-300">
+                    ⚠ This market’s price feed looks inactive — last update{" "}
+                    {staleAgo}. The chart shows the last reported price.
+                  </div>
+                ) : null}
                 <PriceChart points={points} expiry={oracle.expiry} sel={sel} />
               </TabsContent>
 

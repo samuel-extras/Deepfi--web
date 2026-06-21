@@ -3,10 +3,11 @@
 /**
  * Quick-bet modal — lets users bet from the markets list without opening the
  * oracle page. Renders the same `TradeTicket` inside a Dialog on desktop and a
- * Drawer on mobile. Open state + prefill come from the URL via `useBetParams`.
+ * Drawer on mobile. Open state + the full oracle come from `useBetStore` (the
+ * card passes the oracle it already has), so the ticket renders instantly.
  */
 import TradeTicket from "./terminal/TradeTicket";
-import { useBetParams } from "@/hooks/useBetParams";
+import { useBetStore } from "@/stores/useBetStore";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePredictTicket } from "@/hooks/usePredictTicket";
 import {
@@ -23,17 +24,19 @@ import {
 } from "@/components/ui/drawer";
 
 export function BetModal() {
-  const { oracleId, direction, close } = useBetParams();
+  const betOracle = useBetStore((s) => s.oracle);
+  const direction = useBetStore((s) => s.direction);
+  const close = useBetStore((s) => s.close);
   const isDesktop = useMediaQuery("(min-width: 768px)");
-  const open = oracleId != null;
+  const open = betOracle != null;
 
   const { oracle, svi, sel, patchSel, step } = usePredictTicket(
-    open ? oracleId : null,
+    betOracle,
     direction,
   );
 
   const onOpenChange = (next: boolean) => {
-    if (!next) void close();
+    if (!next) close();
   };
 
   const body = oracle ? (

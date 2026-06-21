@@ -8,12 +8,11 @@
  * Reuses PredictTerminal's React Query keys, so an already-loaded market costs
  * no extra fetches.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type {
   Direction,
   OracleDTO,
-  OraclesResponse,
   PricesResponse,
   Selection,
   SviResponse,
@@ -25,24 +24,14 @@ async function fetchJSON<T>(url: string): Promise<T> {
   return (await r.json()) as T;
 }
 
+/**
+ * `oracle` is the full DTO the card already has — so the ticket renders instantly
+ * and only SVI + prices stream in (ungated, so strikes fill fast).
+ */
 export function usePredictTicket(
-  oracleId: string | null,
+  oracle: OracleDTO | null,
   direction: Direction,
 ) {
-  const oraclesQ = useQuery({
-    queryKey: ["predict", "oracles"],
-    queryFn: () => fetchJSON<OraclesResponse>("/api/oracles"),
-    refetchInterval: 10_000,
-    enabled: oracleId != null,
-  });
-  const oracle: OracleDTO | null = useMemo(() => {
-    const all = [
-      ...(oraclesQ.data?.active ?? []),
-      ...(oraclesQ.data?.settled ?? []),
-    ];
-    return all.find((o) => o.oracleId === oracleId) ?? null;
-  }, [oraclesQ.data, oracleId]);
-
   const sviQ = useQuery({
     queryKey: ["predict", "svi", oracle?.oracleId],
     queryFn: () =>

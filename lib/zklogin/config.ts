@@ -1,10 +1,11 @@
 /**
- * zkLogin (Google) — client-safe config. Raw Sui zkLogin, no Enoki.
+ * zkLogin (Google) config — client-safe (NEXT_PUBLIC only).
  *
- * The flow runs CLIENT-SIDE (browser ↔ Google ↔ Mysten prover), like the
- * polymedia demo, so the Next server never reaches googleapis — which is what
- * broke the earlier server-side salt route behind a proxy. The only server
- * piece is the salt route, and it makes no external calls (see its source).
+ * Auth runs client-side via **Enoki's managed nonce + salt + prover**
+ * (api.enoki.mystenlabs.com). Enoki uses testnet/mainnet proving params and
+ * proves for OUR registered audience — which Mysten's public provers can't do
+ * for a custom Google client (dev prover = devnet params → Groth16 fail; prod
+ * prover = audience allowlist). Gas is still paid by our self-hosted sponsor.
  */
 export type ZkProvider = "google";
 
@@ -19,6 +20,14 @@ export interface OidcProvider {
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
+/**
+ * Public Enoki API key (`enoki_public_…`). In the Enoki portal, the app behind
+ * this key MUST register the Google client id as an auth provider AND the app
+ * origin (http://localhost:3140) as an allowed origin — else the proof step 400s
+ * with "audience … not supported".
+ */
+export const ENOKI_API_KEY = process.env.NEXT_PUBLIC_ENOKI_API_KEY ?? "";
+
 export const ZK_PROVIDERS: Record<ZkProvider, OidcProvider> = {
   google: {
     id: "google",
@@ -30,9 +39,9 @@ export const ZK_PROVIDERS: Record<ZkProvider, OidcProvider> = {
   },
 };
 
-/** A provider is usable only once its client id is configured. */
+/** Usable only once BOTH the OAuth client id and the Enoki key are configured. */
 export function zkProviderEnabled(id: ZkProvider): boolean {
-  return Boolean(ZK_PROVIDERS[id]?.clientId);
+  return Boolean(ZK_PROVIDERS[id]?.clientId && ENOKI_API_KEY);
 }
 
 export function anyZkProviderEnabled(): boolean {
@@ -41,7 +50,7 @@ export function anyZkProviderEnabled(): boolean {
 
 /**
  * Redirect URL Google sends the id_token back to. Must be registered in the
- * OAuth client. Pin via env (stable across environments); else derive from origin.
+ * OAuth client. Pin via env; else derive from the current origin in the browser.
  */
 export function zkRedirectUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_ZKLOGIN_REDIRECT_URL;
@@ -50,24 +59,6 @@ export function zkRedirectUrl(): string {
     return `${window.location.origin}/auth/callback`;
   return "/auth/callback";
 }
-
-/** Ephemeral key validity window, in epochs, from the current epoch. */
-export const ZK_MAX_EPOCH_GAP = 2;
-
-/** Which JWT claim names the zkLogin address (sub is stable per user/app). */
-export const ZK_KEY_CLAIM = "sub" as const;
-
-/**
- * Mysten Labs' public ZK proving service — called CLIENT-SIDE (the browser
- * reaches it fine; this avoids any server-side / proxy networking). Override
- * with NEXT_PUBLIC_ZKLOGIN_PROVER_URL to self-host.
- */
-export const ZK_PROVER_URL =
-  process.env.NEXT_PUBLIC_ZKLOGIN_PROVER_URL ??
-  "https://prover-dev.mystenlabs.com/v1";
-
-/** Salt endpoint (server-side HMAC; makes no external calls). */
-export const ZK_SALT_ENDPOINT = "/api/zklogin/salt";
 
 /** sessionStorage keys for the pre-redirect state and the established session. */
 export const ZK_PENDING_KEY = "deepfi:zk:pending";

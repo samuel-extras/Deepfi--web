@@ -1,44 +1,46 @@
 "use client";
 
 /**
- * zkLogin session core — framework-agnostic (no React). Raw Sui zkLogin, no Enoki.
+ * zkLogin session core — framework-agnostic (no React). Auth via **Enoki's**
+ * managed nonce + salt + prover (production params, our registered audience),
+ * which is what makes raw client-side zkLogin work for a custom Google client on
+ * testnet. Gas is still our self-hosted sponsor; the ephemeral key + signing are
+ * still ours.
  *
- *   beginLogin   → ephemeral key + nonce(maxEpoch) → redirect to Google
- *   completeLogin→ (on callback) salt → address → ZK proof → persist session
+ *   beginLogin   → ephemeral key + Enoki nonce(maxEpoch) → redirect to Google
+ *   completeLogin→ (on callback) Enoki address + ZK proof → persist session
  *   zkSign*      → ephemeral-sign bytes + assemble the zkLogin signature
  *
- * The proof is fetched CLIENT-SIDE straight from the Mysten prover (like the
- * polymedia demo); only the salt comes from our server route (no external calls).
  * Session (incl. the ephemeral secret) lives in sessionStorage — cleared on tab
  * close, valid only until `maxEpoch`. Acceptable for testnet.
  */
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
-  decodeJwt,
-  genAddressSeed,
-  generateNonce,
-  generateRandomness,
-  getExtendedEphemeralPublicKey,
   getZkLoginSignature,
-  jwtToAddress,
   type ZkLoginSignatureInputs,
 } from "@mysten/sui/zklogin";
+import { EnokiClient, type EnokiNetwork } from "@mysten/enoki";
 import { getSuiClient } from "@/lib/sui/client";
+import { SUI_NETWORK } from "@/lib/sui/network";
 import {
-  ZK_KEY_CLAIM,
-  ZK_MAX_EPOCH_GAP,
+  ENOKI_API_KEY,
   ZK_PENDING_KEY,
-  ZK_PROVER_URL,
   ZK_PROVIDERS,
-  ZK_SALT_ENDPOINT,
   ZK_SESSION_KEY,
   zkProviderEnabled,
   zkRedirectUrl,
   type ZkProvider,
 } from "./config";
 
-/** The prover's output — the zkLogin inputs minus the locally-computed seed. */
-type ZkProof = Omit<ZkLoginSignatureInputs, "addressSeed">;
+const NETWORK = SUI_NETWORK as EnokiNetwork;
+
+let _enoki: EnokiClient | null = null;
+function enoki(): EnokiClient {
+  if (!ENOKI_API_KEY)
+    throw new Error("Enoki is not configured (NEXT_PUBLIC_ENOKI_API_KEY)");
+  if (!_enoki) _enoki = new EnokiClient({ apiKey: ENOKI_API_KEY });
+  return _enoki;
+}
 
 interface PendingState {
   provider: ZkProvider;
@@ -52,54 +54,23 @@ export interface ZkSession {
   address: string;
   maxEpoch: number;
   ephemeralSecretKey: string;
-  zkProof: ZkProof;
-  addressSeed: string;
-  sub: string;
-  aud: string;
+  /** Full zkLogin inputs from Enoki (proofPoints + issBase64Details + headerBase64 + addressSeed). */
+  zkProof: ZkLoginSignatureInputs;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const text = await r.text();
-  let json: { ok?: boolean; error?: string } & Record<string, unknown>;
-  try {
-    json = text ? JSON.parse(text) : {};
-  } catch {
-    throw new Error(
-      `${url} returned non-JSON (HTTP ${r.status}): ${text.slice(0, 120)}`,
-    );
-  }
-  if (!r.ok || json?.ok === false) {
-    throw new Error(json?.error ?? `${url} failed (HTTP ${r.status})`);
-  }
-  return json as T;
-}
-
-/** Step 1 — mint an ephemeral key, stash pre-redirect state, redirect to Google. */
+/** Step 1 — mint an ephemeral key, get an Enoki nonce, redirect to Google. */
 export async function beginLogin(providerId: ZkProvider): Promise<void> {
   const provider = ZK_PROVIDERS[providerId];
   if (!zkProviderEnabled(providerId)) {
     throw new Error(`${provider.label} is not configured`);
   }
-  let epoch: string;
-  try {
-    ({ epoch } = await getSuiClient().getLatestSuiSystemState());
-  } catch (e) {
-    throw new Error(
-      `Couldn't reach the Sui RPC to start sign-in: ${
-        e instanceof Error ? e.message : String(e)
-      }`,
-    );
-  }
-  const maxEpoch = Number(epoch) + ZK_MAX_EPOCH_GAP;
 
   const ephemeral = new Ed25519Keypair();
-  const randomness = generateRandomness();
-  const nonce = generateNonce(ephemeral.getPublicKey(), maxEpoch, randomness);
+  // Enoki generates the nonce + randomness + maxEpoch (and tracks the window).
+  const { nonce, randomness, maxEpoch } = await enoki().createZkLoginNonce({
+    network: NETWORK,
+    ephemeralPublicKey: ephemeral.getPublicKey(),
+  });
 
   const pending: PendingState = {
     provider: providerId,
@@ -117,7 +88,7 @@ export async function beginLogin(providerId: ZkProvider): Promise<void> {
     scope: provider.scopes.join(" "),
     nonce,
   });
-  // redirect_uri must be registered EXACTLY in the Google OAuth client.
+  // This redirect_uri must be registered EXACTLY in the Google OAuth client.
   console.info(
     `[zkLogin] redirect_uri = "${redirectUri}"  ·  client_id = "${provider.clientId}"`,
   );
@@ -130,36 +101,17 @@ export async function completeLogin(idToken: string): Promise<ZkSession> {
   if (!raw) throw new Error("No pending zkLogin — start the sign-in again");
   const pending = JSON.parse(raw) as PendingState;
 
-  const decoded = decodeJwt(idToken);
-  if (!decoded.sub || !decoded.aud) throw new Error("Invalid id_token");
-  const aud = Array.isArray(decoded.aud) ? decoded.aud[0] : decoded.aud;
-
-  // salt (server, HMAC, no external calls) → address
-  const { salt } = await postJson<{ salt: string }>(ZK_SALT_ENDPOINT, {
-    jwt: idToken,
-  });
-  const address = jwtToAddress(idToken, salt, false);
-
-  // ZK proof — straight from the Mysten prover, client-side (like the demo)
   const ephemeral = Ed25519Keypair.fromSecretKey(pending.ephemeralSecretKey);
-  const extendedEphemeralPublicKey = getExtendedEphemeralPublicKey(
-    ephemeral.getPublicKey(),
-  );
-  const zkProof = await postJson<ZkProof>(ZK_PROVER_URL, {
-    jwt: idToken,
-    extendedEphemeralPublicKey,
-    maxEpoch: pending.maxEpoch,
-    jwtRandomness: pending.randomness,
-    salt,
-    keyClaimName: ZK_KEY_CLAIM,
-  });
 
-  const addressSeed = genAddressSeed(
-    BigInt(salt),
-    ZK_KEY_CLAIM,
-    decoded.sub,
-    aud,
-  ).toString();
+  // Enoki: the user's address (its salt) + the ZK proof (full signature inputs).
+  const { address } = await enoki().getZkLogin({ jwt: idToken });
+  const zkProof = await enoki().createZkLoginZkp({
+    network: NETWORK,
+    jwt: idToken,
+    ephemeralPublicKey: ephemeral.getPublicKey(),
+    randomness: pending.randomness,
+    maxEpoch: pending.maxEpoch,
+  });
 
   const session: ZkSession = {
     provider: pending.provider,
@@ -167,9 +119,6 @@ export async function completeLogin(idToken: string): Promise<ZkSession> {
     maxEpoch: pending.maxEpoch,
     ephemeralSecretKey: pending.ephemeralSecretKey,
     zkProof,
-    addressSeed,
-    sub: decoded.sub,
-    aud,
   };
   sessionStorage.setItem(ZK_SESSION_KEY, JSON.stringify(session));
   sessionStorage.removeItem(ZK_PENDING_KEY);
@@ -184,7 +133,7 @@ export async function zkSignTransaction(
   const ephemeral = Ed25519Keypair.fromSecretKey(session.ephemeralSecretKey);
   const { signature: userSignature } = await ephemeral.signTransaction(bytes);
   return getZkLoginSignature({
-    inputs: { ...session.zkProof, addressSeed: session.addressSeed },
+    inputs: session.zkProof,
     maxEpoch: session.maxEpoch,
     userSignature,
   });
@@ -199,7 +148,7 @@ export async function zkSignPersonalMessage(
   const { signature: userSignature } =
     await ephemeral.signPersonalMessage(message);
   return getZkLoginSignature({
-    inputs: { ...session.zkProof, addressSeed: session.addressSeed },
+    inputs: session.zkProof,
     maxEpoch: session.maxEpoch,
     userSignature,
   });

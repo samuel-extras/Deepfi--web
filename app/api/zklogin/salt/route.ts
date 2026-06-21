@@ -9,12 +9,10 @@ export const runtime = "nodejs";
  *
  *   salt = HMAC_SHA256(ZKLOGIN_SALT_SECRET, "iss|aud|sub")  (first 16 bytes, < 2^128)
  *
- * NOTE: we DECODE the JWT (claims only) rather than verifying its signature.
- * Verifying would need Google's JWKS from googleapis.com, which isn't reachable
- * from the server behind some proxies — and it isn't required here: the Mysten
- * prover (called client-side) cryptographically verifies the JWT, and leaking a
- * salt only lets someone compute a *public* address, never move funds. Good for
- * testnet. For production (no proxy), re-add `jose` signature verification.
+ * NOTE: web auth now uses Enoki (Enoki manages the salt) and no longer calls
+ * this. It's kept for the **deepfi-mobile relay**: mobile signs in through this
+ * web OAuth client (see app/auth/callback) and derives its salt here. Decodes
+ * the JWT rather than verifying it (no googleapis fetch); fine for testnet.
  */
 export async function POST(req: NextRequest) {
   try {

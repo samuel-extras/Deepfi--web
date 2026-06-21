@@ -16,6 +16,7 @@ import { usePredictMint } from "@/hooks/usePredictMint";
 import { usePredictBinaryMint } from "@/hooks/usePredictBinaryMint";
 import { DUSDC_FAUCET_URL } from "@/lib/deepbook";
 import { probInRange } from "@/lib/svi";
+import { useLiveForward, useLiveForwardAny } from "@/stores/useOracleLiveStore";
 import FundingBar from "@/components/wallet/FundingBar";
 import SviSmileChart from "@/components/prediction/SviSmileChart";
 import RangeLadderPanel from "@/components/prediction/RangeLadderPanel";
@@ -130,7 +131,13 @@ export default function PredictMarkets({ mirrorParams }: { mirrorParams?: Mirror
   });
 
   const active = oraclesQ.data?.active ?? [];
-  const forward = sviQ.data?.forward;
+  // Prefer the freshest live fullnode forward across active oracles (robust to
+  // the soonest one going quiet) over the indexer's copy.
+  const liveForward = useLiveForwardAny([
+    sviQ.data?.oracleId,
+    ...active.map((o) => o.oracleId),
+  ]);
+  const forward = liveForward ?? sviQ.data?.forward;
   const atmIv = sviQ.data?.atmIv;
 
   return (
@@ -294,13 +301,15 @@ function OracleCard({
 // ─── RANGE card ───────────────────────────────────────────────────────────────
 function RangeCard({
   o,
-  forward,
+  forward: forwardProp,
   initialAmount,
 }: {
   o: OracleDTO;
   forward?: number;
   initialAmount?: string;
 }) {
+  // Prefer this oracle's live fullnode forward over the indexer's.
+  const forward = useLiveForward(o.oracleId) ?? forwardProp;
   const { mint, isMinting, status, isConnected } = usePredictMint();
   const [amount, setAmount] = useState(initialAmount ?? "5");
   const [ticks, setTicks] = useState(4); // half-width in ticks
@@ -391,13 +400,15 @@ function RangeCard({
 // ─── BINARY card ──────────────────────────────────────────────────────────────
 function BinaryCard({
   o,
-  forward,
+  forward: forwardProp,
   initialAmount,
 }: {
   o: OracleDTO;
   forward?: number;
   initialAmount?: string;
 }) {
+  // Prefer this oracle's live fullnode forward over the indexer's.
+  const forward = useLiveForward(o.oracleId) ?? forwardProp;
   const { mint, isMinting, status, isConnected } = usePredictBinaryMint();
   const [amount, setAmount] = useState(initialAmount ?? "5");
   const [strikeTicks, setStrikeTicks] = useState(0); // offset from ATM in ticks

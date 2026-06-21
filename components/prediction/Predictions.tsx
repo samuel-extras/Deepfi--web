@@ -24,6 +24,9 @@ import {
   type PredictMarketDTO,
   type MintActivity,
 } from "../../lib/events";
+import { useActiveAccount } from "@/hooks/useActiveAccount";
+import { useSuiClientQuery } from "@mysten/dapp-kit";
+import { COIN_TYPES } from "@/lib/deepbook";
 
 const FAVORITES_KEY = "ui-check-favorites";
 
@@ -227,13 +230,29 @@ export default function PredictionList() {
     );
   }, [filteredEvents]);
 
+  // Real wallet balance — the user's spendable dUSDC for the active (zkLogin)
+  // address. dUSDC is a USD stablecoin (6 decimals), shown as "$X.XX".
+  const account = useActiveAccount();
+  const owner = account?.address;
+  const dusdcQ = useSuiClientQuery(
+    "getBalance",
+    { owner: owner ?? "", coinType: COIN_TYPES.dusdc },
+    { enabled: !!owner, refetchInterval: 15_000 },
+  );
+  const walletBalance = owner
+    ? `$${(Number(dusdcQ.data?.totalBalance ?? 0) / 1e6).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    : "$0.00";
+
   const showInitialSkeleton = booting;
   const isRefreshingData = false;
 
   return (
     <div className="flex flex-col  ">
       <div className="container mx-auto max-w-360 w-full shrink-0 pt-4 md:pt-6 px-4 md:px-6 flex flex-col gap-4">
-        <EventsHeader />
+        <EventsHeader balance={walletBalance} />
 
         <div className="flex items-center gap-2 justify-between sm:justify-end">
           <SearchToolbar
