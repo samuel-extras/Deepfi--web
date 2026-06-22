@@ -61,10 +61,6 @@ function getLazyModalComponent(
 }
 
 const MODAL_CONFIG: Record<ModalId, ModalConfig> = {
-  connectAccount: { load: () => import("./auth/ConnectAccountModal") },
-  emailLogin: { load: () => import("./auth/EmailLoginModal") },
-  accountConfirmed: { load: () => import("./auth/AccountConfirmedModal") },
-  termsAndConditions: { load: () => import("./auth/TermsAndConditionsModal") },
   confirmAction: { load: () => import("./ConfirmActionModal") },
   onboarding: {
     load: () =>

@@ -14,13 +14,13 @@
  * proxy orders). Repay and cancels need no oracles.
  */
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { Account, DeepBookClient, Order } from "@mysten/deepbook-v3";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   DB_NETWORK,
@@ -277,13 +277,22 @@ export function useMarginSnapshot(poolKey: string) {
     queryKey: ["deepbook", "marginSnapshot", poolKey, managerId],
     enabled: !!client && !!address && !!managerId,
     refetchInterval: 10_000,
+    // Keep the last snapshot on screen across polls / pool switches so the
+    // account strip never drops back to its "Loading…" placeholder.
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<MarginSnapshot> => {
       const db = client!;
       const tx = new Transaction();
       tx.setSender(address!);
       // refresh stale feeds in the same (simulated) tx so manager_state's
       // oracle reads pass the freshness check
-      await db.getPriceInfoObjects(tx, [pool.base, pool.quote]);
+      try {
+        await db.getPriceInfoObjects(tx, [pool.base, pool.quote]);
+      } catch (e) {
+        if (process.env.NODE_ENV !== "production")
+          console.error("[margin] getPriceInfoObjects (Pyth) failed:", e);
+        throw e;
+      }
       tx.add(db.marginManager.managerState(poolKey, managerId!));
       tx.add(db.marginManager.baseBalance(poolKey, managerId!));
       tx.add(db.marginManager.quoteBalance(poolKey, managerId!));
@@ -298,6 +307,13 @@ export function useMarginSnapshot(poolKey: string) {
         transactionBlock: tx,
       });
       if (res.effects?.status?.status !== "success" || !res.results) {
+        if (process.env.NODE_ENV !== "production")
+          console.error(
+            "[margin] snapshot devInspect failed:",
+            res.effects?.status?.error,
+            "| results:",
+            res.results?.length ?? 0,
+          );
         throw new Error(humanizeMarginError(res.effects?.status?.error));
       }
       // from the end: account, orderDetails, balance_manager(ref), condIds,
@@ -351,6 +367,41 @@ export function useMarginSnapshot(poolKey: string) {
   });
 }
 
+// Last good snapshot per account+pool, at module scope so it survives component
+// remounts AND query-key churn. Keyed by the stable wallet address (not the
+// managerId, which is what churns and resets the snapshot query) so the strip
+// never flips back to its "Loading…" placeholder once it has loaded — while an
+// actual account switch still falls through to a real load (address guard).
+const lastSnapshot = new Map<
+  string,
+  { address: string; snap: MarginSnapshot }
+>();
+
+/**
+ * `useMarginSnapshot` whose `data` stays sticky after the first successful load:
+ * if the live query is momentarily empty (e.g. managerId re-resolved and the
+ * snapshot key churned), the last good snapshot for this account is returned
+ * instead. Use this wherever the UI shows a snapshot-driven loading placeholder
+ * so it only appears on the genuine first load.
+ */
+export function useStickyMarginSnapshot(poolKey: string) {
+  const q = useMarginSnapshot(poolKey);
+  const address = useActiveAccount()?.address;
+
+  useEffect(() => {
+    if (q.data && address)
+      lastSnapshot.set(poolKey, { address, snap: q.data });
+  }, [q.data, address, poolKey]);
+
+  let data = q.data;
+  if (!data) {
+    const cached = lastSnapshot.get(poolKey);
+    // serve the cached snapshot unless we know it belongs to another account
+    if (cached && (!address || cached.address === address)) data = cached.snap;
+  }
+  return { ...q, data };
+}
+
 /** Full details for the snapshot's conditional (TP/SL) orders. */
 export function useConditionalOrders(poolKey: string) {
   const suiClient = useSuiClient();
@@ -362,6 +413,7 @@ export function useConditionalOrders(poolKey: string) {
   return useQuery({
     queryKey: ["deepbook", "tpslOrders", poolKey, managerId, ids.join(",")],
     enabled: !!address && !!managerId && ids.length > 0,
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<TpslOrder[]> => {
       const tx = new Transaction();
       tx.setSender(address!);

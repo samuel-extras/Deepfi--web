@@ -7,15 +7,15 @@ import { NavLinkItem, NavDropdown } from "./nav-link-item";
 import { Button } from "@/components/ui/button";
 import { CompetitionIcon, EarnIcon, LogoIcon } from "@/components/icons";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { usePrivy } from "@privy-io/react-auth";
 import UserMenu from "./UserMenu";
 import { WalletBalanceMenu } from "./WalletBalanceMenu";
-import { useDisconnect } from "wagmi";
 import { useDisconnectWallet } from "@mysten/dapp-kit";
 import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { MobileNav } from "./MobileNav";
 import { HamburgerIcon } from "./HamburgerIcon";
 import { useUserProfileStore } from "@/stores/useUserProfileStore";
+import { useZkLoginStore } from "@/stores/useZkLoginStore";
+import { useBalanceStore } from "@/stores/useBalanceStore";
 import { SettingsDropdown } from "./SettingsDropdown";
 import { useAppSettingsStore } from "@/stores/useAppSettingsStore";
 import { dexBackendApi } from "@/services/api/dexBackendApi";
@@ -39,24 +39,25 @@ export type DropdownItem = {
 export type Item = SimpleItem | DropdownItem;
 
 export const navItems: Item[] = [
-  { href: "/spot/DBUSDC/SUI", label: "Spot" },
-  { href: "/margin/DBUSDC/SUI", label: "Margin" },
   {
     href: "/prediction",
     label: "Prediction",
   },
+  { href: "/spot/DBUSDC/SUI", label: "Spot" },
+  { href: "/margin/DBUSDC/SUI", label: "Margin" },
   { href: "/prediction/surface", label: "Surface" },
   { href: "/prediction/risk", label: "Risk" },
+  { href: "/prediction/combo", label: "Combo" },
   {
     href: "/portfolio",
     label: "Portfolio",
   },
-  { href: "/earn", label: "Earn", iconLeft: <EarnIcon /> },
+  { href: "/earn", label: "Earn" },
   {
     href: "/social",
     label: "Social",
   },
-  { href: "/competition", label: "Competition", iconLeft: <CompetitionIcon /> },
+  { href: "/competition", label: "Competition" },
 ];
 
 // Condensed nav for narrower screens — groups less-used links into dropdowns
@@ -70,6 +71,8 @@ export const condensedNavItems: Item[] = [
     children: [
       { href: "/prediction/surface", label: "Surface" },
       { href: "/prediction/risk", label: "Risk" },
+      { href: "/prediction/combo", label: "Combo" },
+
       { href: "/earn", label: "Earn", iconLeft: <EarnIcon /> },
       { href: "/social", label: "Social" },
       {
@@ -161,8 +164,6 @@ export default function Navbar() {
   const pathname = usePathname();
   const { isAuthenticated, userInfo, logout } = useAuthStore();
   const resetUserProfile = useUserProfileStore((state) => state.reset);
-  const { logout: privyLogout, exportWallet } = usePrivy();
-  const { disconnect } = useDisconnect();
   const { mutate: disconnectSui } = useDisconnectWallet();
   const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
   const [connectOpen, setConnectOpen] = React.useState(false);
@@ -182,12 +183,15 @@ export default function Navbar() {
     const token = useAuthStore.getState().jwtToken;
     // Logout from backend API (non-blocking) - pass token explicitly
     void dexBackendApi.logout(token);
-    privyLogout();
-    disconnect();
     disconnectSui();
+    // Clear the zkLogin (Google) session too — otherwise it stays in
+    // sessionStorage and SuiAuthBridge silently re-authenticates on reload.
+    useZkLoginStore.getState().logout();
+    // Drop persisted balances so stale values (e.g. predictions) don't linger.
+    useBalanceStore.getState().reset();
     resetUserProfile();
     logout();
-  }, [disconnect, disconnectSui, logout, privyLogout, resetUserProfile]);
+  }, [disconnectSui, logout, resetUserProfile]);
 
   // Map global settings to dropdown format
   const settings = React.useMemo(
@@ -230,28 +234,6 @@ export default function Navbar() {
       }
     },
     [updateSetting],
-  );
-
-  const actions = React.useMemo(
-    () => [
-      {
-        id: "export-private-key",
-        label: "Export Private Key",
-        type: "action" as const,
-      },
-    ],
-    [],
-  );
-
-  const handleActionClick = React.useCallback(
-    (id: string) => {
-      if (id === "export-private-key") {
-        void exportWallet().catch((error: unknown) => {
-          console.error("Error exporting private key:", error);
-        });
-      }
-    },
-    [exportWallet],
   );
 
   const handleConnectAccount = React.useCallback(() => {
@@ -328,7 +310,7 @@ export default function Navbar() {
   );
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#121417]/80! backdrop-blur! supports-backdrop-filter:bg-[#121417]/60!">
       <div className="mx-auto flex h-12 items-center justify-between px-4">
         <div className="flex items-center gap-6">
           <Link href="/" prefetch={false} className="flex items-center gap-2">
@@ -352,7 +334,7 @@ export default function Navbar() {
               onOpenChange={setConnectOpen}
               trigger={
                 <Button
-                  className="font-semibold text-xs text-[#0E0E0E] rounded-[25px] hover:cursor-pointer"
+                  className="font-semibold text-xs text-[#0E0E0E] rounded-[25px] hover:cursor-pointer bg-foreground/90 px-6 hover:bg-foreground"
                   type="button"
                 >
                   Connect
@@ -371,9 +353,7 @@ export default function Navbar() {
           )}
           <SettingsDropdown
             settings={settings}
-            actions={actions}
             onSettingChange={handleSettingChange}
-            onActionClick={handleActionClick}
           />
 
           <HamburgerIcon isOpen={isMobileNavOpen} onClick={toggleMobileNav} />

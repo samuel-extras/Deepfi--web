@@ -1,12 +1,8 @@
 /*eslint-disable*/
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
-import { Briefcase, Clock, Loader2 } from "lucide-react";
+import { Briefcase, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  fetchPolymarketMarket,
-  fetchPolymarketMarketByTokenId,
-} from "@/services/api/polymarket-actions";
 
 interface OpenOrderCardProps {
   order: any;
@@ -16,104 +12,11 @@ interface OpenOrderCardProps {
 }
 
 export const OpenOrderCard: React.FC<OpenOrderCardProps> = ({
-  order: initialOrder,
+  order,
   index,
   formatCurrency,
   onCancel,
 }) => {
-  const [marketData, setMarketData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const marketId = (
-    initialOrder.market ||
-    initialOrder.market_id ||
-    initialOrder.conditionId ||
-    initialOrder.conditionID ||
-    ""
-  )
-    .toString()
-    .toLowerCase();
-  const tokenId = (
-    initialOrder.asset_id ||
-    initialOrder.tokenID ||
-    initialOrder.tokenId ||
-    initialOrder.token_id ||
-    initialOrder.asset ||
-    ""
-  )
-    .toString()
-    .toLowerCase();
-
-  // Self-fetch metadata if missing or hex-id title
-  useEffect(() => {
-    const hasHexTitle =
-      !initialOrder.title ||
-      initialOrder.title?.toLowerCase().startsWith("0x") ||
-      initialOrder.title?.includes("Market 0x") ||
-      initialOrder.title === "Unknown Market";
-    const isMissingIcon = !initialOrder.image && !initialOrder.icon;
-
-    if (hasHexTitle || isMissingIcon) {
-      setIsLoading(true);
-
-      // Try resolving by token ID first for CLOB orders as it's more specific
-      const resolveMetadata = async () => {
-        try {
-          let data = null;
-          if (tokenId && (tokenId.length > 20 || tokenId.startsWith("0x"))) {
-            data = await fetchPolymarketMarketByTokenId(tokenId);
-          }
-
-          if (!data && marketId.startsWith("0x")) {
-            data = await fetchPolymarketMarket(marketId);
-          }
-
-          if (data) setMarketData(data);
-        } catch (err) {
-          console.error("[OpenOrderCard] Resolution failed:", err);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      resolveMetadata();
-    }
-  }, [
-    marketId,
-    tokenId,
-    initialOrder.title,
-    initialOrder.image,
-    initialOrder.icon,
-  ]);
-
-  // Merge initial data with fetched metadata
-  const order = {
-    ...initialOrder,
-    title:
-      initialOrder.title?.startsWith("Market 0x") && marketData
-        ? marketData.question
-        : initialOrder.title,
-    image: initialOrder.image || initialOrder.icon || marketData?.icon,
-    outcome:
-      initialOrder.outcome ||
-      (marketData
-        ? (() => {
-            let yesTokenId = "";
-            if (marketData.clobTokenIds) {
-              try {
-                const tids = JSON.parse(marketData.clobTokenIds);
-                if (Array.isArray(tids) && tids.length > 0)
-                  yesTokenId = String(tids[0]).toLowerCase();
-              } catch (e) {}
-            }
-            if (!yesTokenId && marketData.tokens?.[0]?.tokenId) {
-              yesTokenId = marketData.tokens[0].tokenId.toLowerCase();
-            }
-            return yesTokenId ? (tokenId === yesTokenId ? "Yes" : "No") : "";
-          })()
-        : ""),
-  };
-
   const displayTitle = order.title || "Unknown Market";
   const displayFullTitle = order.outcome
     ? `${order.title} (${order.outcome})`
@@ -132,11 +35,7 @@ export const OpenOrderCard: React.FC<OpenOrderCardProps> = ({
             />
           ) : (
             <div className="h-11 w-11 bg-white/5 rounded-xl flex items-center justify-center shrink-0">
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 text-[#02DA8B] animate-spin" />
-              ) : (
-                <Briefcase className="h-5 w-5 text-[#6B7280]" />
-              )}
+              <Briefcase className="h-5 w-5 text-[#6B7280]" />
             </div>
           )}
           <div className="min-w-0 pr-2">

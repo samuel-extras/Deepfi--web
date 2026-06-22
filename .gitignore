@@ -44,3 +44,16 @@ next-env.d.ts
 # static files
 # /public/static
 .next-preview/
+
+/docs
+
+/.claude
+/.agents
+AGENTS.md
+CLAUDE.md
+deepbook-margin.md
+deepBook-predict.md
+DeepBookPredictProblemStatement.md
+deepbookv3.md
+SETUP-ZKLOGIN.md
+

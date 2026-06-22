@@ -16,7 +16,7 @@ import { enqueueRoutePrefetch } from "@/lib/perf/prefetchQueue";
 import type { SimpleItem } from ".";
 
 const isPlainLeftClick = (
-  event: React.MouseEvent<HTMLAnchorElement>
+  event: React.MouseEvent<HTMLAnchorElement>,
 ): boolean => {
   return (
     event.button === 0 &&
@@ -40,7 +40,7 @@ const getTradeRouteSegmentCount = (path: string): number => {
 
 const getNavItemActiveState = (
   item: SimpleItem,
-  pathname: string | null
+  pathname: string | null,
 ): boolean => {
   if (!pathname) return false;
 
@@ -81,12 +81,12 @@ export function NavLinkItem({
       if (!isPlainLeftClick(event)) return;
       onNavigateStart?.(href);
     },
-    [href, onNavigateStart]
+    [href, onNavigateStart],
   );
 
   const handleIntentPrefetch = React.useCallback(() => {
     setActive(true);
-    enqueueRoutePrefetch(href, target => router.prefetch(target));
+    enqueueRoutePrefetch(href, (target) => router.prefetch(target));
   }, [href, router]);
 
   return (
@@ -99,7 +99,9 @@ export function NavLinkItem({
       className={cn(
         "flex items-center gap-2 px-3 py-2 rounded-sm transition-colors",
         "text-xs leading-[18px] font-normal",
-        isActive ? "text-primary" : "text-nav-inactive lg:hover:text-white"
+        isActive
+          ? "text-white font-semibold"
+          : "text-white/80 lg:hover:text-white",
       )}
     >
       {iconLeft}
@@ -128,7 +130,7 @@ function NavDropdownItemRow({
 
   const handleIntentPrefetch = () => {
     setActive(true);
-    enqueueRoutePrefetch(item.href, target => router.prefetch(target));
+    enqueueRoutePrefetch(item.href, (target) => router.prefetch(target));
   };
 
   return (
@@ -142,7 +144,9 @@ function NavDropdownItemRow({
       <DropdownMenuItem
         className={cn(
           "text-xs leading-[18px] font-normal lg:hover:bg-[#02DA8B26] lg:hover:text-primary hover:cursor-pointer",
-          isActive ? "text-primary" : "text-nav-inactive"
+          isActive
+            ? "text-white font-semibold"
+            : "text-white/80 lg:hover:text-white",
         )}
       >
         {item.iconLeft}
@@ -173,7 +177,9 @@ export function NavDropdown({
         <button
           className={cn(
             "flex items-center gap-1 px-3 py-2 rounded-sm transition-colors hover:cursor-pointer text-xs leading-[18px] font-normal",
-            anyActive ? "text-primary" : "text-nav-inactive lg:hover:text-white"
+            anyActive
+              ? "text-primary"
+              : "text-nav-inactive lg:hover:text-white",
           )}
           type="button"
         >
@@ -183,7 +189,7 @@ export function NavDropdown({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-[#0f1113] border-white/10">
-        {items.map(c => (
+        {items.map((c) => (
           <NavDropdownItemRow
             key={c.href}
             item={c}

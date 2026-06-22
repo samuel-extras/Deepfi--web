@@ -64,7 +64,7 @@ export default function AccountTables({ poolKey }: { poolKey: string }) {
                 </TabsTrigger>
               ))}
               <div
-                className="absolute bottom-0 h-px rounded-full bg-primary transition-all duration-300"
+                className="absolute bottom-0 h-0.5 rounded-full bg-foreground transition-all duration-300"
                 style={{ left: indicator.left, width: indicator.width }}
               />
             </TabsList>

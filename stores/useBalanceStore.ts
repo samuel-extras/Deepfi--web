@@ -31,13 +31,17 @@ export interface MarginOverview {
 interface BalanceState {
   marginOverview: MarginOverview | null;
   spotBalances: SpotBalance[];
+  /** Total Predict manager account value in USD (cash + open positions). */
   predictionsBalance: string;
+  /** Spendable (uncommitted) dUSDC inside the Predict manager, in USD. */
+  predictionsTradingBalance: string;
 }
 
 interface BalanceActions {
   setMarginOverview: (overview: MarginOverview | null) => void;
   setSpotBalances: (balances: SpotBalance[]) => void;
   setPredictionsBalance: (balance: string) => void;
+  setPredictionsTradingBalance: (balance: string) => void;
   reset: () => void;
 }
 
@@ -45,6 +49,7 @@ const initialState: BalanceState = {
   marginOverview: null,
   spotBalances: [],
   predictionsBalance: "0.00",
+  predictionsTradingBalance: "0.00",
 };
 
 export const useBalanceStore = create<BalanceState & BalanceActions>()(
@@ -64,6 +69,10 @@ export const useBalanceStore = create<BalanceState & BalanceActions>()(
         set({ predictionsBalance: balance });
       },
 
+      setPredictionsTradingBalance: balance => {
+        set({ predictionsTradingBalance: balance });
+      },
+
       reset: () => {
         set(initialState);
       },
@@ -74,6 +83,7 @@ export const useBalanceStore = create<BalanceState & BalanceActions>()(
         marginOverview: state.marginOverview,
         spotBalances: state.spotBalances,
         predictionsBalance: state.predictionsBalance,
+        predictionsTradingBalance: state.predictionsTradingBalance,
       }),
     }
   )
@@ -81,6 +91,9 @@ export const useBalanceStore = create<BalanceState & BalanceActions>()(
 
 export const usePredictionsBalance = () =>
   useBalanceStore(state => state.predictionsBalance);
+
+export const usePredictionsTradingBalance = () =>
+  useBalanceStore(state => state.predictionsTradingBalance);
 
 export const useMarginOverview = () =>
   useBalanceStore(state => state.marginOverview);

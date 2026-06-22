@@ -6,9 +6,9 @@
  * TP / SL · Order History · Earn.
  */
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
 import { cn } from "@/lib/utils";
@@ -24,12 +24,12 @@ import {
   maxLeverage,
   type MarginPosition,
 } from "@/lib/sui/deepbookMargin";
-import { useWalletBalances } from "@/hooks/useDeepBookSpot";
+import { useOrderbookMid, useWalletBalances } from "@/hooks/useDeepBookSpot";
 import {
   useMarginActions,
   useMarginManager,
   useMarginPoolStats,
-  useMarginSnapshot,
+  useStickyMarginSnapshot,
   useRiskParams,
   type MarginSide,
 } from "@/hooks/useDeepBookMargin";
@@ -50,70 +50,67 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "earn", label: "Earn" },
 ];
 
-export default function MarginAccountTables({
-  poolKey,
-  midPrice,
-}: {
-  poolKey: string;
-  midPrice: number | null;
-}) {
+// memo'd so the parent terminal's ~3s mid-price re-renders don't propagate into
+// the account strip; the live mid is sourced inside the leaves that need it.
+function MarginAccountTables({ poolKey }: { poolKey: string }) {
   const [activeTab, setActiveTab] = useState<TabId>("position");
   const tabTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const onTabTriggerRef = useCallback(
     (id: string, el: HTMLButtonElement | null) => {
       tabTriggerRefs.current[id] = el;
     },
-    []
+    [],
   );
   const { listRef, indicator } = useTabIndicator(activeTab, tabTriggerRefs);
-  const { data: snap } = useMarginSnapshot(poolKey);
+  const { data: snap } = useStickyMarginSnapshot(poolKey);
 
   return (
     <div className="border-t border-border bg-[#121417] col-span-4">
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as TabId)} className="gap-0">
-        <div className="flex h-[44px] items-center border-b border-border overflow-x-auto">
-          <div className="relative h-full" ref={listRef as React.RefObject<HTMLDivElement>}>
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as TabId)}
+        className="gap-0"
+      >
+        <div className="flex h-10 items-center border-b border-border overflow-x-auto">
+          <div
+            className="relative h-full"
+            ref={listRef as React.RefObject<HTMLDivElement>}
+          >
             <TabsList className="h-full bg-transparent p-0 gap-0">
-              {TABS.map(t => (
+              {TABS.map((t) => (
                 <TabsTrigger
                   key={t.id}
                   value={t.id}
-                  ref={el => onTabTriggerRef(t.id, el)}
+                  ref={(el) => onTabTriggerRef(t.id, el)}
                   className="h-full rounded-none px-4 text-xs data-[state=active]:bg-transparent"
                 >
                   {t.label}
                   {t.id === "openOrders" && (snap?.orders.length ?? 0) > 0
                     ? ` (${snap!.orders.length})`
                     : ""}
-                  {t.id === "tpsl" && (snap?.conditionalOrderIds.length ?? 0) > 0
+                  {t.id === "tpsl" &&
+                  (snap?.conditionalOrderIds.length ?? 0) > 0
                     ? ` (${snap!.conditionalOrderIds.length})`
                     : ""}
                 </TabsTrigger>
               ))}
               <div
-                className="absolute bottom-0 h-[2px] rounded-full bg-primary transition-all duration-300"
+                className="absolute bottom-0 h-0.5 rounded-full bg-foreground transition-all duration-300"
                 style={{ left: indicator.left, width: indicator.width }}
               />
             </TabsList>
           </div>
         </div>
 
-        <div className="min-h-[240px] max-h-[360px] overflow-y-auto">
+        <div className="min-h-60 max-h-90 overflow-y-auto">
           <TabsContent value="position" className="mt-0">
-            <PositionTab poolKey={poolKey} midPrice={midPrice} />
+            <PositionTab poolKey={poolKey} />
           </TabsContent>
           <TabsContent value="openOrders" className="mt-0">
             <MarginOpenOrdersTab poolKey={poolKey} />
           </TabsContent>
           <TabsContent value="tpsl" className="mt-0">
-            <div className="p-3">
-              {/* TpslPanel self-hides without an account; CTA covers that case */}
-              <TpslPanel poolKey={poolKey} midPrice={midPrice} />
-              <NeedsAccount
-                label="Connect and create a margin account to arm TP/SL orders."
-                poolKey={poolKey}
-              />
-            </div>
+            <MarginTpslTab poolKey={poolKey} />
           </TabsContent>
           <TabsContent value="orderHistory" className="mt-0">
             <MarginOrderHistoryTab poolKey={poolKey} />
@@ -129,10 +126,31 @@ export default function MarginAccountTables({
   );
 }
 
+export default memo(MarginAccountTables);
+
+/** TP/SL tab leaf — owns the live-mid subscription so the tabs shell doesn't. */
+function MarginTpslTab({ poolKey }: { poolKey: string }) {
+  const midPrice = useOrderbookMid(poolKey);
+  return (
+    <div className="p-3">
+      {/* TpslPanel self-hides without an account; CTA covers that case */}
+      <TpslPanel poolKey={poolKey} midPrice={midPrice} />
+      <NeedsAccount
+        label="Connect and create a margin account to arm TP/SL orders."
+        poolKey={poolKey}
+      />
+    </div>
+  );
+}
+
 /* ------------------------------- shared -------------------------------- */
 
 function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="px-4 py-8 text-center text-xs text-nav-inactive">{children}</div>;
+  return (
+    <div className="px-4 py-8 text-center text-xs text-nav-inactive">
+      {children}
+    </div>
+  );
 }
 
 function NeedsAccount({ label, poolKey }: { label: string; poolKey?: string }) {
@@ -146,7 +164,11 @@ function NeedsAccount({ label, poolKey }: { label: string; poolKey?: string }) {
       {!address ? (
         <ConnectWalletDialog
           trigger={
-            <Button type="button" size="sm" className="rounded-full bg-primary text-[#121417] font-semibold">
+            <Button
+              type="button"
+              size="sm"
+              className="rounded-full bg-primary text-[#121417] font-semibold"
+            >
               Connect wallet
             </Button>
           }
@@ -170,11 +192,13 @@ function NeedsAccount({ label, poolKey }: { label: string; poolKey?: string }) {
 
 type ActionKind = "deposit" | "withdraw" | "borrow" | "repay";
 
-function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number | null }) {
+function PositionTab({ poolKey }: { poolKey: string }) {
   const pool = getMarginPoolMeta(poolKey);
+  const midPrice = useOrderbookMid(poolKey);
   const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
-  const { data: snap, isLoading } = useMarginSnapshot(poolKey);
+  const snapQ = useStickyMarginSnapshot(poolKey);
+  const { data: snap, isLoading } = snapQ;
   const { data: risk } = useRiskParams(poolKey);
   const { data: poolStats } = useMarginPoolStats(poolKey);
   const { data: walletBal } = useWalletBalances();
@@ -186,9 +210,26 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
   const amountNum = parseFloat(amount) || 0;
 
   if (!address || !managerId)
-    return <NeedsAccount label="Connect and create a margin account to manage your position." poolKey={poolKey} />;
+    return (
+      <NeedsAccount
+        label="Connect and create a margin account to manage your position."
+        poolKey={poolKey}
+      />
+    );
 
-  if (isLoading && !snap) return <EmptyState>Loading position…</EmptyState>;
+  if (isLoading && !snap) {
+    if (process.env.NODE_ENV !== "production")
+      // TEMP diagnostic: capture the actual React Query state behind the flash.
+      console.warn(
+        `[margin] loading shown @ ${new Date().toISOString()}` +
+          ` status=${snapQ.status} fetch=${snapQ.fetchStatus}` +
+          ` isFetching=${snapQ.isFetching} isError=${snapQ.isError}` +
+          ` dataUpdatedAt=${snapQ.dataUpdatedAt} errorUpdatedAt=${snapQ.errorUpdatedAt}` +
+          ` failureCount=${snapQ.failureCount}` +
+          ` err=${(snapQ.error as Error | null)?.message?.slice(0, 200) ?? "·"}`,
+      );
+    return <EmptyState>Loading position…</EmptyState>;
+  }
 
   const pos: MarginPosition = {
     baseAsset: snap?.baseAsset ?? 0,
@@ -204,11 +245,14 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
   const lev = effectiveLeverage(pos, price);
   const liqPx = risk ? liquidationPrice(pos, risk.liquidation) : null;
   const rr = snap?.riskRatio ?? null;
-  const borrowHeadroom = risk ? maxAdditionalBorrowQuote(pos, price, risk.minBorrow) : 0;
+  const borrowHeadroom = risk
+    ? maxAdditionalBorrowQuote(pos, price, risk.minBorrow)
+    : 0;
 
   const coinOf = (s: MarginSide) => (s === "base" ? pool.base : pool.quote);
   const maxFor = (k: ActionKind, s: MarginSide): number => {
-    const bal = s === "base" ? snap?.balances.base ?? 0 : snap?.balances.quote ?? 0;
+    const bal =
+      s === "base" ? (snap?.balances.base ?? 0) : (snap?.balances.quote ?? 0);
     const debt = s === "base" ? pos.baseDebt : pos.quoteDebt;
     switch (k) {
       case "deposit": {
@@ -218,8 +262,16 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
       case "withdraw":
         return bal;
       case "borrow": {
-        const headroom = s === "quote" ? borrowHeadroom : price > 0 ? borrowHeadroom / price : 0;
-        const liquidity = s === "base" ? poolStats?.base.available ?? 0 : poolStats?.quote.available ?? 0;
+        const headroom =
+          s === "quote"
+            ? borrowHeadroom
+            : price > 0
+              ? borrowHeadroom / price
+              : 0;
+        const liquidity =
+          s === "base"
+            ? (poolStats?.base.available ?? 0)
+            : (poolStats?.quote.available ?? 0);
         return Math.max(0, Math.min(headroom, liquidity));
       }
       case "repay":
@@ -239,15 +291,26 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
   const gaugePct =
     rr == null || !risk
       ? 100
-      : Math.max(2, Math.min(100, ((rr - risk.liquidation) / (2.5 - risk.liquidation)) * 100));
+      : Math.max(
+          2,
+          Math.min(
+            100,
+            ((rr - risk.liquidation) / (2.5 - risk.liquidation)) * 100,
+          ),
+        );
 
   const run = async () => {
     if (amountNum <= 0 && kind !== "repay") return;
     const max = maxFor(kind, side);
     if (kind === "deposit") await actions.depositCollateral(side, amountNum);
-    else if (kind === "withdraw") await actions.withdrawCollateral(side, amountNum);
+    else if (kind === "withdraw")
+      await actions.withdrawCollateral(side, amountNum);
     else if (kind === "borrow") await actions.borrow(side, amountNum);
-    else await actions.repay(side, amountNum >= max - 1e-9 || amountNum === 0 ? undefined : amountNum);
+    else
+      await actions.repay(
+        side,
+        amountNum >= max - 1e-9 || amountNum === 0 ? undefined : amountNum,
+      );
     setAmount("");
   };
 
@@ -255,12 +318,33 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
     <div>
       {/* stats row */}
       <div className="grid grid-cols-2 gap-4 px-4 py-3 sm:grid-cols-3 lg:grid-cols-7">
-        <Cell label={`Equity (${pool.quote})`} value={formatAmount(equity, 4)} />
-        <Cell label={`Debt (${pool.quote})`} value={formatAmount(debts, 4)} tone={hasDebt ? "text-[#FF4D4F]" : undefined} />
-        <Cell label="Risk Ratio" value={rr == null ? "∞" : formatAmount(rr, 3)} tone={riskTone} />
-        <Cell label="Leverage" value={Number.isFinite(lev) ? `${formatAmount(lev, 2)}x` : "—"} />
-        <Cell label="Est. Liq. Price" value={liqPx != null ? formatAmount(liqPx, 6) : "—"} />
-        <Cell label={`Borrowable (${pool.quote})`} value={formatAmount(borrowHeadroom, 2)} tone="text-primary" />
+        <Cell
+          label={`Equity (${pool.quote})`}
+          value={formatAmount(equity, 4)}
+        />
+        <Cell
+          label={`Debt (${pool.quote})`}
+          value={formatAmount(debts, 4)}
+          tone={hasDebt ? "text-[#FF4D4F]" : undefined}
+        />
+        <Cell
+          label="Risk Ratio"
+          value={rr == null ? "∞" : formatAmount(rr, 3)}
+          tone={riskTone}
+        />
+        <Cell
+          label="Leverage"
+          value={Number.isFinite(lev) ? `${formatAmount(lev, 2)}x` : "—"}
+        />
+        <Cell
+          label="Est. Liq. Price"
+          value={liqPx != null ? formatAmount(liqPx, 6) : "—"}
+        />
+        <Cell
+          label={`Borrowable (${pool.quote})`}
+          value={formatAmount(borrowHeadroom, 2)}
+          tone="text-primary"
+        />
         <Cell
           label="Borrow APR"
           value={`${formatAmount(poolStats?.base.borrowAprPct, 1)}% / ${formatAmount(poolStats?.quote.borrowAprPct, 1)}%`}
@@ -278,7 +362,7 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
                   ? "bg-[#FF4D4F]"
                   : rr != null && rr < risk.minBorrow
                     ? "bg-[#FFB84D]"
-                    : "bg-primary"
+                    : "bg-primary",
               )}
               style={{ width: `${gaugePct}%` }}
             />
@@ -294,16 +378,32 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
 
       {/* free funds */}
       <div className="border-t border-border/60 px-4 py-2 text-[11px] text-nav-inactive">
-        Free in account: <span className="text-white">{formatAmount(snap?.balances.base, 4)} {pool.base}</span> ·{" "}
-        <span className="text-white">{formatAmount(snap?.balances.quote, 4)} {pool.quote}</span>
-        {pos.baseDebt > 0 && <span className="text-[#FF4D4F]"> · owes {formatAmount(pos.baseDebt, 4)} {pool.base}</span>}
-        {pos.quoteDebt > 0 && <span className="text-[#FF4D4F]"> · owes {formatAmount(pos.quoteDebt, 4)} {pool.quote}</span>}
+        Free in account:{" "}
+        <span className="text-white">
+          {formatAmount(snap?.balances.base, 4)} {pool.base}
+        </span>{" "}
+        ·{" "}
+        <span className="text-white">
+          {formatAmount(snap?.balances.quote, 4)} {pool.quote}
+        </span>
+        {pos.baseDebt > 0 && (
+          <span className="text-[#FF4D4F]">
+            {" "}
+            · owes {formatAmount(pos.baseDebt, 4)} {pool.base}
+          </span>
+        )}
+        {pos.quoteDebt > 0 && (
+          <span className="text-[#FF4D4F]">
+            {" "}
+            · owes {formatAmount(pos.quoteDebt, 4)} {pool.quote}
+          </span>
+        )}
       </div>
 
       {/* manage row */}
       <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-3">
         <div className="flex gap-1">
-          {(["deposit", "withdraw", "borrow", "repay"] as const).map(k => (
+          {(["deposit", "withdraw", "borrow", "repay"] as const).map((k) => (
             <button
               key={k}
               onClick={() => setKind(k)}
@@ -311,7 +411,7 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
                 "rounded-full border px-3 py-1.5 text-[11px] capitalize transition-colors",
                 kind === k
                   ? "border-primary bg-primary/10 text-white"
-                  : "border-[#2D3134] text-nav-inactive hover:text-white"
+                  : "border-[#2D3134] text-nav-inactive hover:text-white",
               )}
             >
               {k}
@@ -319,7 +419,7 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
           ))}
         </div>
         <div className="flex gap-1">
-          {(["base", "quote"] as const).map(s => (
+          {(["base", "quote"] as const).map((s) => (
             <button
               key={s}
               onClick={() => setSide(s)}
@@ -327,7 +427,7 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
                 "rounded-full border px-3 py-1.5 text-[11px] transition-colors",
                 side === s
                   ? "border-[#3A3E42] bg-[#1A1D1F] text-white"
-                  : "border-[#2D3134] text-nav-inactive hover:text-white"
+                  : "border-[#2D3134] text-nav-inactive hover:text-white",
               )}
             >
               {coinOf(s)}
@@ -337,9 +437,11 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
         <div className="flex min-w-[170px] flex-1 items-center gap-2 rounded-full border border-[#2D3134] px-3 py-1.5 sm:flex-none sm:w-60">
           <input
             inputMode="decimal"
-            placeholder={kind === "repay" ? "amount (empty = repay all)" : "0.0"}
+            placeholder={
+              kind === "repay" ? "amount (empty = repay all)" : "0.0"
+            }
             value={amount}
-            onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+            onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
             className="w-full bg-transparent text-xs text-white outline-none placeholder:text-nav-inactive/70"
           />
           <button
@@ -372,11 +474,23 @@ function PositionTab({ poolKey, midPrice }: { poolKey: string; midPrice: number 
   );
 }
 
-function Cell({ label, value, tone }: { label: string; value: string; tone?: string }) {
+function Cell({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] text-nav-inactive whitespace-nowrap">{label}</span>
-      <span className={cn("text-xs font-medium tabular-nums text-white", tone)}>{value}</span>
+      <span className="text-[11px] text-nav-inactive whitespace-nowrap">
+        {label}
+      </span>
+      <span className={cn("text-xs font-medium tabular-nums text-white", tone)}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -387,10 +501,13 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
   const pool = getMarginPoolMeta(poolKey);
   const address = useActiveAccount()?.address;
   const { managerId } = useMarginManager(poolKey);
-  const { data: snap, isLoading } = useMarginSnapshot(poolKey);
+  const { data: snap, isLoading } = useStickyMarginSnapshot(poolKey);
   const { cancelOrder, cancelAllOrders, claimSettled, modifyOrder, isPending } =
     useMarginActions(poolKey);
-  const [editing, setEditing] = useState<{ orderId: string; qty: string } | null>(null);
+  const [editing, setEditing] = useState<{
+    orderId: string;
+    qty: string;
+  } | null>(null);
 
   type OrderRow = NonNullable<typeof snap>["orders"][number];
   const columns = useMemo<ColumnDef<OrderRow>[]>(
@@ -408,7 +525,12 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
         accessorKey: "isBid",
         header: "Side",
         cell: ({ row }) => (
-          <span className={cn("font-medium", row.original.isBid ? "text-primary" : "text-[#FF4D4F]")}>
+          <span
+            className={cn(
+              "font-medium",
+              row.original.isBid ? "text-primary" : "text-[#FF4D4F]",
+            )}
+          >
             {row.original.isBid ? "Long" : "Short"}
           </span>
         ),
@@ -416,16 +538,26 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
       {
         accessorKey: "price",
         header: ({ column }) => (
-          <SortHeader column={column} title={`Price (${pool.quote})`} align="right" />
+          <SortHeader
+            column={column}
+            title={`Price (${pool.quote})`}
+            align="right"
+          />
         ),
         cell: ({ row }) => (
-          <div className="text-right text-white tabular-nums">{formatAmount(row.original.price, 6)}</div>
+          <div className="text-right text-white tabular-nums">
+            {formatAmount(row.original.price, 6)}
+          </div>
         ),
       },
       {
         accessorKey: "quantity",
         header: ({ column }) => (
-          <SortHeader column={column} title={`Size (${pool.base})`} align="right" />
+          <SortHeader
+            column={column}
+            title={`Size (${pool.base})`}
+            align="right"
+          />
         ),
         cell: ({ row }) =>
           editing?.orderId === row.original.orderId ? (
@@ -434,19 +566,26 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
                 autoFocus
                 inputMode="decimal"
                 value={editing.qty}
-                onChange={e =>
-                  setEditing({ orderId: row.original.orderId, qty: e.target.value.replace(/[^0-9.]/g, "") })
+                onChange={(e) =>
+                  setEditing({
+                    orderId: row.original.orderId,
+                    qty: e.target.value.replace(/[^0-9.]/g, ""),
+                  })
                 }
                 className="w-20 rounded border border-[#2D3134] bg-transparent px-2 py-0.5 text-right text-xs text-white outline-none"
               />
             </div>
           ) : (
-            <div className="text-right text-white tabular-nums">{formatAmount(row.original.quantity, 6)}</div>
+            <div className="text-right text-white tabular-nums">
+              {formatAmount(row.original.quantity, 6)}
+            </div>
           ),
       },
       {
         accessorKey: "filled",
-        header: ({ column }) => <SortHeader column={column} title="Filled" align="right" />,
+        header: ({ column }) => (
+          <SortHeader column={column} title="Filled" align="right" />
+        ),
         cell: ({ row }) => (
           <div className="text-right text-nav-inactive tabular-nums">
             {row.original.filled > 0
@@ -476,7 +615,10 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
               <button
                 disabled={
                   isPending ||
-                  !(parseFloat(editing.qty) > o.filled && parseFloat(editing.qty) < o.quantity)
+                  !(
+                    parseFloat(editing.qty) > o.filled &&
+                    parseFloat(editing.qty) < o.quantity
+                  )
                 }
                 onClick={async () => {
                   await modifyOrder(o.orderId, parseFloat(editing.qty));
@@ -487,7 +629,10 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
               >
                 Save
               </button>
-              <button onClick={() => setEditing(null)} className="text-nav-inactive hover:text-white">
+              <button
+                onClick={() => setEditing(null)}
+                className="text-nav-inactive hover:text-white"
+              >
                 Back
               </button>
             </div>
@@ -495,7 +640,9 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
             <div className="text-right whitespace-nowrap">
               <button
                 disabled={isPending}
-                onClick={() => setEditing({ orderId: o.orderId, qty: String(o.quantity) })}
+                onClick={() =>
+                  setEditing({ orderId: o.orderId, qty: String(o.quantity) })
+                }
                 className="mr-3 text-nav-inactive hover:text-white disabled:opacity-50"
                 title="Reduce order size (protocol allows shrinking only)"
               >
@@ -513,17 +660,23 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
         },
       },
     ],
-    [editing, isPending, pool.base, pool.quote, modifyOrder, cancelOrder]
+    [editing, isPending, pool.base, pool.quote, modifyOrder, cancelOrder],
   );
 
   if (!address || !managerId)
-    return <NeedsAccount label="Connect and create a margin account to see open orders." poolKey={poolKey} />;
+    return (
+      <NeedsAccount
+        label="Connect and create a margin account to see open orders."
+        poolKey={poolKey}
+      />
+    );
   if (isLoading && !snap) return <EmptyState>Loading orders…</EmptyState>;
 
   const orders = snap?.orders ?? [];
   const settled = snap?.settled;
   const hasSettled =
-    !!settled && (settled.base > 1e-9 || settled.quote > 1e-9 || settled.deep > 1e-9);
+    !!settled &&
+    (settled.base > 1e-9 || settled.quote > 1e-9 || settled.deep > 1e-9);
 
   return (
     <div>
@@ -538,7 +691,8 @@ function MarginOpenOrdersTab({ poolKey }: { poolKey: string }) {
               onClick={() => claimSettled()}
               className="h-6 rounded-full text-[11px]"
             >
-              Claim settled ({formatAmount(settled!.base)} {pool.base} / {formatAmount(settled!.quote)} {pool.quote})
+              Claim settled ({formatAmount(settled!.base)} {pool.base} /{" "}
+              {formatAmount(settled!.quote)} {pool.quote})
             </Button>
           )}
           {orders.length > 1 && (
@@ -592,7 +746,9 @@ function useMarginBmId(poolKey: string) {
       const content = res.data?.content;
       const fields =
         content && "fields" in content
-          ? (content.fields as { balance_manager?: { fields?: { id?: { id?: string } } } })
+          ? (content.fields as {
+              balance_manager?: { fields?: { id?: { id?: string } } };
+            })
           : null;
       return fields?.balance_manager?.fields?.id?.id ?? null;
     },
@@ -616,10 +772,11 @@ function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
     queryKey: ["deepbook", "marginOrderHistory", poolKey, bmId],
     enabled: !!bmId,
     refetchInterval: 10_000,
+    placeholderData: keepPreviousData,
     queryFn: async () =>
       (await fetch(`/api/deepbook/orders?pool=${poolKey}&bm=${bmId}&limit=50`, {
         cache: "no-store",
-      }).then(r => r.json())) as { orders: HistoryRow[] },
+      }).then((r) => r.json())) as { orders: HistoryRow[] },
   });
 
   const columns = useMemo<ColumnDef<HistoryRow>[]>(
@@ -637,7 +794,12 @@ function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
         accessorKey: "type",
         header: "Side",
         cell: ({ row }) => (
-          <span className={cn("font-medium", row.original.type === "buy" ? "text-primary" : "text-[#FF4D4F]")}>
+          <span
+            className={cn(
+              "font-medium",
+              row.original.type === "buy" ? "text-primary" : "text-[#FF4D4F]",
+            )}
+          >
             {row.original.type === "buy" ? "Long" : "Short"}
           </span>
         ),
@@ -645,16 +807,26 @@ function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
       {
         accessorKey: "price",
         header: ({ column }) => (
-          <SortHeader column={column} title={`Price (${pool.quote})`} align="right" />
+          <SortHeader
+            column={column}
+            title={`Price (${pool.quote})`}
+            align="right"
+          />
         ),
         cell: ({ row }) => (
-          <div className="text-right text-white tabular-nums">{formatAmount(row.original.price, 6)}</div>
+          <div className="text-right text-white tabular-nums">
+            {formatAmount(row.original.price, 6)}
+          </div>
         ),
       },
       {
         accessorKey: "original_quantity",
         header: ({ column }) => (
-          <SortHeader column={column} title={`Size (${pool.base})`} align="right" />
+          <SortHeader
+            column={column}
+            title={`Size (${pool.base})`}
+            align="right"
+          />
         ),
         cell: ({ row }) => (
           <div className="text-right text-white tabular-nums">
@@ -664,10 +836,14 @@ function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
       },
       {
         accessorKey: "filled_quantity",
-        header: ({ column }) => <SortHeader column={column} title="Filled" align="right" />,
+        header: ({ column }) => (
+          <SortHeader column={column} title="Filled" align="right" />
+        ),
         cell: ({ row }) => (
           <div className="text-right text-nav-inactive tabular-nums">
-            {row.original.filled_quantity > 0 ? formatAmount(row.original.filled_quantity, 4) : "—"}
+            {row.original.filled_quantity > 0
+              ? formatAmount(row.original.filled_quantity, 4)
+              : "—"}
           </div>
         ),
       },
@@ -675,18 +851,29 @@ function MarginOrderHistoryTab({ poolKey }: { poolKey: string }) {
         accessorKey: "current_status",
         header: () => <div className="text-right">Status</div>,
         cell: ({ row }) => (
-          <div className={cn("text-right", historyStatusColor(row.original.current_status))}>
+          <div
+            className={cn(
+              "text-right",
+              historyStatusColor(row.original.current_status),
+            )}
+          >
             {row.original.current_status}
           </div>
         ),
       },
     ],
-    [pool.base, pool.quote]
+    [pool.base, pool.quote],
   );
 
   if (!address || !managerId)
-    return <NeedsAccount label="Connect and create a margin account to see order history." poolKey={poolKey} />;
-  if (history.isLoading) return <EmptyState>Loading history…</EmptyState>;
+    return (
+      <NeedsAccount
+        label="Connect and create a margin account to see order history."
+        poolKey={poolKey}
+      />
+    );
+  if (history.isLoading && !history.data)
+    return <EmptyState>Loading history…</EmptyState>;
 
   const rows = history.data?.orders ?? [];
 

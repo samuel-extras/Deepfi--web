@@ -126,7 +126,7 @@ function BookTabs({
                 Trades
               </TabsTrigger>
               <div
-                className="absolute bottom-0 h-px bg-primary rounded-full transition-all duration-300"
+                className="absolute bottom-0 h-0.5 bg-foreground rounded-full transition-all duration-300"
                 style={{ left: indicator.left, width: indicator.width }}
               />
             </TabsList>

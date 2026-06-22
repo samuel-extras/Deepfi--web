@@ -27,7 +27,7 @@ export default function OrderTypeTabs({
           <TabsTrigger
             key={t}
             value={t}
-            className="relative flex-none rounded-none border-0 bg-transparent px-0 py-2.5 text-sm font-medium text-nav-inactive shadow-none transition-colors hover:text-white data-[state=active]:bg-transparent data-[state=active]:text-white dark:text-nav-inactive dark:hover:text-white dark:data-[state=active]:text-white after:absolute after:inset-x-0 after:h-px! after:rounded-full after:bg-primary after:opacity-0 data-[state=active]:after:opacity-100 group-data-horizontal/tabs:after:-bottom-px h-10"
+            className="relative flex-none rounded-none border-0 bg-transparent px-0 py-2.5 text-sm font-medium text-nav-inactive shadow-none transition-colors hover:text-white data-[state=active]:bg-transparent data-[state=active]:text-white dark:text-nav-inactive dark:hover:text-white dark:data-[state=active]:text-white after:absolute after:inset-x-0 after:h-0.5! after:rounded-full after:bg-foreground after:opacity-0 data-[state=active]:after:opacity-100 group-data-horizontal/tabs:after:-bottom-px h-10"
           >
             {ORDER_TYPE_LABELS[t]}
           </TabsTrigger>

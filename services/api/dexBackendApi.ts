@@ -6,7 +6,7 @@ import axios, {
 import axiosRetry, { exponentialDelay } from "axios-retry";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useUserProfileStore } from "@/stores/useUserProfileStore";
-import { EventType, getDeviceLabel } from "./types";
+import { EventType } from "./types";
 import { eventBus, EventType as EventBusType } from "@/lib/events/eventBus";
 import type {
   UserProfileResponse,
@@ -162,36 +162,6 @@ function createAxiosInstanceWithRetry(
   return instance;
 }
 
-interface AuthenticateParams {
-  privyId: string;
-  walletAddress: string;
-  email?: string;
-  deviceLabel?: string;
-  referralCode?: string;
-  onSuccess?: (accessToken: string) => void;
-}
-
-interface AuthenticateRequest {
-  privyId: string;
-  walletAddress: string;
-  email?: string;
-  deviceLabel?: string;
-}
-
-interface AuthenticateResponse {
-  success: boolean;
-  data: {
-    accessToken: string;
-    user: {
-      id: string;
-      privyId: string | null;
-      email: string | null;
-      walletAddress: string;
-    };
-  };
-  message: string;
-}
-
 interface LogoutResponse {
   success: boolean;
   message: string;
@@ -246,45 +216,6 @@ class DexBackendApiService {
       return;
     }
     this.client = createAxiosInstanceWithRetry(baseURL);
-  }
-
-  public async authenticate(params: AuthenticateParams): Promise<void> {
-    if (!this.client) {
-      console.warn(
-        "Backend API client not initialized. Skipping authenticate."
-      );
-      return;
-    }
-
-    try {
-      const { referralCode, onSuccess, ...userData } = params;
-
-      const requestData: AuthenticateRequest = {
-        ...userData,
-        deviceLabel: userData.deviceLabel || getDeviceLabel(),
-      };
-
-      const requestConfig = referralCode
-        ? { params: { referralCode } }
-        : undefined;
-
-      const response = await this.client.post<AuthenticateResponse>(
-        API_ENDPOINTS.auth.authenticate,
-        requestData,
-        requestConfig
-      );
-
-      if (response.data.success && response.data.data.accessToken) {
-        const { accessToken } = response.data.data;
-        useAuthStore.getState().setJwtToken(accessToken);
-
-        if (onSuccess) {
-          onSuccess(accessToken);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to authenticate with backend:", error);
-    }
   }
 
   public async logout(token?: string | null): Promise<void> {

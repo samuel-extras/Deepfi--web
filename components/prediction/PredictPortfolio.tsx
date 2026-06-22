@@ -33,15 +33,16 @@ import { OpenOrderCard } from "@/components/prediction/OpenOrderCard";
 import { ActivityCard } from "@/components/prediction/ActivityCard";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  usePolymarketPortfolio,
-  PortfolioTimeframe,
-} from "@/hooks/usePolymarketPortfolio";
 import { toast } from "sonner";
-import { usePredictionsBalance } from "@/stores/useBalanceStore";
-import { useTradingSession } from "@/hooks/useTradingSession";
+import {
+  usePredictionsBalance,
+  usePredictionsTradingBalance,
+} from "@/stores/useBalanceStore";
+import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useReferralCode } from "@/stores/useUserProfileStore";
 import { getAvatarEmoji, getAvatarGradient } from "@/lib/avatar";
+
+type PortfolioTimeframe = "24H" | "7D" | "30D" | "ALL";
 
 const formatCurrency = (val?: number) => {
   if (val === undefined || val === null) return "$0.00";
@@ -62,31 +63,27 @@ export default function PredictionPortfolioClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
-  const { clobClient, initializeTradingSession, isTradingSessionComplete } =
-    useTradingSession();
+  // Portfolio position/order/activity feeds are not yet wired to DeepBook +
+  // Predict on-chain state — render the empty-state scaffold until they land.
+  const account = useActiveAccount();
+  const positions: any[] = [];
+  const closedPositions: any[] = [];
+  const orders: any[] = [];
+  const activity: any[] = [];
+  const tradedCount = 0;
+  const plHistory: { time: string; value: number }[] = [];
+  const isLoading = false;
+  const portfolioAddress = account?.address ?? "";
 
-  const {
-    profile,
-    positions,
-    closedPositions,
-    orders,
-    activity,
-    totalValue,
-    cashBalance: _, // Ignore internal cash balance
-    tradedCount,
-    plHistory,
-    isLoading,
-    error,
-    address: portfolioAddress,
-    refresh,
-  } = usePolymarketPortfolio(timeframe, clobClient);
-
-  const polymarketBalance = usePredictionsBalance();
-  const cashBalance = Number(polymarketBalance) || 0;
+  // Total Predict account value (matches the main portfolio's "Predictions
+  // Balance"); Available Cash is the spendable trading balance within it.
+  const predictionsBalance = usePredictionsBalance();
+  const predictionsTradingBalance = usePredictionsTradingBalance();
+  const totalValue = Number(predictionsBalance) || 0;
+  const cashBalance = Number(predictionsTradingBalance) || 0;
 
   const referralCode = useReferralCode();
-  const displayName =
-    referralCode || profile?.name || profile?.pseudonym || "Buddy";
+  const displayName = referralCode || "Buddy";
   const avatarEmoji = useMemo(() => getAvatarEmoji(displayName), [displayName]);
   const avatarGradient = useMemo(
     () => getAvatarGradient(displayName),
@@ -99,21 +96,7 @@ export default function PredictionPortfolioClient() {
   };
 
   const handleCancelOrder = (order: any) => {
-    openModal("cancelPredictionOrder", {
-      order,
-      onConfirm: async (orderId: string) => {
-        if (!clobClient) return;
-        const toastId = toast.loading("Cancelling order...");
-        try {
-          await clobClient.cancelOrder({ orderID: orderId });
-          toast.success("Order cancelled successfully", { id: toastId });
-          refresh();
-        } catch (err: any) {
-          console.error("Failed to cancel order:", err);
-          toast.error(err.message || "Failed to cancel order", { id: toastId });
-        }
-      },
-    });
+    openModal("cancelPredictionOrder", { order });
   };
 
   const openModal = (_id: string, _props?: any) =>
@@ -240,14 +223,10 @@ export default function PredictionPortfolioClient() {
             </div>
           </div>
           <Button
-            onClick={() =>
-              !isTradingSessionComplete
-                ? initializeTradingSession()
-                : handleTransferClick()
-            }
+            onClick={handleTransferClick}
             className="w-full bg-[#02DA8B] hover:bg-[#02DA8B]/90 text-black border-none font-bold h-10 text-xs transition-all active:scale-[0.98]"
           >
-            {isTradingSessionComplete ? "Transfer Funds" : "Initialize Session"}
+            Transfer Funds
           </Button>
         </div>
       </div>
@@ -287,7 +266,7 @@ export default function PredictionPortfolioClient() {
                       <Copy className="h-3 w-3" />
                     </button>
                     <a
-                      href={`https://polygonscan.com/address/${portfolioAddress}`}
+                      href={`https://testnet.suivision.xyz/account/${portfolioAddress}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:text-white transition-colors p-0.5"

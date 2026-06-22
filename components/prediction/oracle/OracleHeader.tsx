@@ -1,6 +1,6 @@
 // Single-oracle page header — asset mark, param-driven title + status, and a
-// strip of live stats (spot, ATM strike, IV, or settlement). Mirrors the
-// Polymarket market header but driven entirely by the oracle in the URL param.
+// strip of live stats (spot, ATM strike, IV, or settlement), driven entirely by
+// the oracle in the URL param.
 "use client";
 
 import { useEffect, useState } from "react";

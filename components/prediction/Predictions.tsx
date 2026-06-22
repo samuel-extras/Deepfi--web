@@ -26,6 +26,7 @@ import {
 } from "../../lib/events";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useSuiClientQuery } from "@mysten/dapp-kit";
+import { useQuery } from "@tanstack/react-query";
 import { COIN_TYPES } from "@/lib/deepbook";
 
 const FAVORITES_KEY = "ui-check-favorites";
@@ -51,9 +52,37 @@ const formatDate = (dateStr?: string) => {
 export default function PredictionList() {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const [booting, setBooting] = useState(true);
-  const [events, setEvents] = useState<PredictEvent[]>([]);
-  const [recentMints, setRecentMints] = useState<MintActivity[]>([]);
+  // Markets + activity live in the React Query cache (browser-level singleton,
+  // refetchOnMount:false) so navigating back to /prediction serves the last
+  // result instantly instead of remounting into an empty/booting state.
+  const marketsQ = useQuery({
+    queryKey: ["prediction", "markets"],
+    queryFn: async () => {
+      const res = await fetch("/api/prediction-markets");
+      const json: { ok: boolean; markets?: PredictMarketDTO[] } =
+        await res.json();
+      if (!json.ok || !json.markets) throw new Error("bad markets response");
+      return json.markets;
+    },
+  });
+  const events = useMemo<PredictEvent[]>(
+    () => (marketsQ.data ? marketsToEvents(marketsQ.data) : []),
+    [marketsQ.data],
+  );
+  // Only show the booting skeleton on the very first load (no cached data yet).
+  const booting = marketsQ.isLoading;
+
+  const activityQ = useQuery({
+    queryKey: ["prediction", "activity"],
+    queryFn: async () => {
+      const res = await fetch("/api/prediction-activity");
+      const json: { ok: boolean; mints?: MintActivity[] } = await res.json();
+      if (!json.ok || !json.mints) throw new Error("bad activity response");
+      return json.mints;
+    },
+    refetchInterval: 4000,
+  });
+  const recentMints = activityQ.data ?? [];
 
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -72,48 +101,6 @@ export default function PredictionList() {
     startDate: "",
     endDate: "",
   });
-
-  // Load DeepBook prediction markets (oracles) from the indexer proxy.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/prediction-markets");
-        const json: { ok: boolean; markets?: PredictMarketDTO[] } =
-          await res.json();
-        if (alive && json.ok && json.markets) {
-          setEvents(marketsToEvents(json.markets));
-        }
-      } catch {
-        // network/indexer error → fall through to the empty state
-      } finally {
-        if (alive) setBooting(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Poll the recent-buys feed that drives the live "+$X" floats on series cards.
-  useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      try {
-        const res = await fetch("/api/prediction-activity");
-        const json: { ok: boolean; mints?: MintActivity[] } = await res.json();
-        if (alive && json.ok && json.mints) setRecentMints(json.mints);
-      } catch {
-        // ignore — floats just won't update this tick
-      }
-    };
-    poll();
-    const t = setInterval(poll, 4000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
 
   // Load favourites from localStorage (mirrors dex FavoritesService).
   useEffect(() => {

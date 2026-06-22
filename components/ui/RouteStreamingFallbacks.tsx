@@ -74,16 +74,6 @@ export function TopTradersPageSkeleton() {
   );
 }
 
-/** `/wallet-export` — Privy gate + actions. */
-export function WalletExportPageSkeleton() {
-  return (
-    <div className="mx-auto max-w-lg space-y-4 px-4 py-10">
-      <PanelFallback className="h-36" />
-      <PanelFallback className="h-28" />
-    </div>
-  );
-}
-
 /** `/social/followings` and `/social/leaderboard` while client chunk loads. */
 export function SocialSubpageSkeleton() {
   return (

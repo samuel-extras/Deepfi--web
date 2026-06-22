@@ -108,7 +108,7 @@ export default function MarginTerminal() {
             </div>
           </div>
           <div className="grid grid-cols-5 shrink-0 overflow-hidden">
-            <MarginAccountTables poolKey={poolKey} midPrice={midPrice} />
+            <MarginAccountTables poolKey={poolKey} />
             <MarginAccountSummary
               poolKey={poolKey}
               midPrice={midPrice}
@@ -143,7 +143,7 @@ export default function MarginTerminal() {
           {mobileTab === "account" && (
             <div className="min-h-[80vh]">
               <MarginAccountSummary poolKey={poolKey} midPrice={midPrice} />
-              <MarginAccountTables poolKey={poolKey} midPrice={midPrice} />
+              <MarginAccountTables poolKey={poolKey} />
             </div>
           )}
         </div>

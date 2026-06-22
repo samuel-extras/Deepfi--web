@@ -11,11 +11,8 @@ const CODE_EXT = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
 const RESOLVE_EXT = [...CODE_EXT, ".json", ".css"];
 
 const ALIASES = {
-  "wagmi": "shims/wagmi/index.tsx",
-  "wagmi/chains": "shims/wagmi/chains.ts",
-  "wagmi/connectors": "shims/wagmi/connectors.ts",
-  "@privy-io/react-auth": "shims/privy/react-auth.tsx",
-  "@privy-io/wagmi": "shims/privy/wagmi.ts",
+  "react-native": "shims/empty-module.ts",
+  "@react-native-async-storage/async-storage": "shims/empty-module.ts",
 };
 
 // Next.js app-router files that are roots (auto-discovered, never imported)

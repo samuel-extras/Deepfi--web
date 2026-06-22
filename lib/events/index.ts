@@ -1,13 +1,55 @@
 // ---------------------------------------------------------------------------
 // Adapter: DeepBook Predict oracles → card-ready events.
 //
-// Replaces the old static Polymarket snapshot. Each active oracle is a binary
-// market — "<asset> above or below <ATM strike> on <expiry>?" — and
-// settled oracles carry their resolution. We keep the PolymarketEvent shape so
-// the existing list/table view + filter pipeline render unchanged, and attach a
-// `predict` payload the card reads for the above/below framing.
+// Each active oracle is a binary market — "<asset> above or below <ATM strike>
+// on <expiry>?" — and settled oracles carry their resolution. The list/table
+// view + filter pipeline read the generic `EventBase` shape below, and each
+// event also carries a `predict` payload the card reads for the above/below
+// framing.
 // ---------------------------------------------------------------------------
-import type { PolymarketEvent } from "./polymarket";
+
+/** One binary/categorical market within an event. */
+export type EventMarket = {
+  id: string;
+  question: string;
+  conditionId: string;
+  slug: string;
+  /** JSON-encoded string[] e.g. '["Yes","No"]'. */
+  outcomes: string;
+  /** JSON-encoded string[] of 0..1 prices, aligned with `outcomes`. */
+  outcomePrices: string;
+  /** Stringified notional. */
+  volume: string;
+  active: boolean;
+  closed: boolean;
+  groupItemTitle: string;
+  image?: string;
+  icon?: string;
+  description?: string;
+  liquidity?: string;
+  spread?: number;
+  bestBid?: number;
+  bestAsk?: number;
+};
+
+/** A tradeable event grouping one or more `markets`. */
+export type EventBase = {
+  id: string;
+  ticker: string;
+  slug: string;
+  title: string;
+  active: boolean;
+  closed: boolean;
+  volume: number;
+  liquidity: number;
+  /** ISO timestamps. */
+  endDate: string;
+  startDate: string;
+  markets: EventMarket[];
+  image?: string;
+  icon?: string;
+  description?: string;
+};
 
 /** Shape returned by /api/prediction-markets (see app/api/prediction-markets). */
 export type PredictMarketDTO = {
@@ -24,7 +66,7 @@ export type PredictMarketDTO = {
   volume: number;
 };
 
-/** DeepBook specifics the card needs that don't fit the Polymarket shape. */
+/** DeepBook specifics the card needs that don't fit the base event shape. */
 export type PredictPayload = {
   oracleId: string;
   asset: string;
@@ -38,7 +80,7 @@ export type PredictPayload = {
   settlementPrice: number | null;
 };
 
-export type PredictEvent = PolymarketEvent & { predict: PredictPayload };
+export type PredictEvent = EventBase & { predict: PredictPayload };
 
 /** One recent buy from /api/prediction-activity — drives the live float feed. */
 export type MintActivity = {

@@ -1,18 +1,11 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-// During the DEXV2 -> DeepFi (Sui) migration we replaced Privy + Wagmi (EVM)
-// with local mock shims (see shims/). The bundler needs these aliases so the
-// (uninstalled) `wagmi` / `@privy-io/*` bare imports resolve to the shims.
+// Some wallet/Sui deps reference react-native; stub them out for web via the
+// aliases below (see shims/empty-module.ts).
 const r = (p: string) => path.resolve(__dirname, p);
 
 const SHIM_ALIASES: Record<string, string> = {
-  wagmi: r("shims/wagmi/index.tsx"),
-  "wagmi/chains": r("shims/wagmi/chains.ts"),
-  "wagmi/connectors": r("shims/wagmi/connectors.ts"),
-  "@privy-io/react-auth": r("shims/privy/react-auth.tsx"),
-  "@privy-io/wagmi": r("shims/privy/wagmi.ts"),
-  // some wallet/Sui deps reference react-native; stub them out for web.
   "react-native": r("shims/empty-module.ts"),
   "@react-native-async-storage/async-storage": r("shims/empty-module.ts"),
 };
@@ -36,11 +29,6 @@ const nextConfig: NextConfig = {
   },
   turbopack: {
     resolveAlias: {
-      wagmi: "./shims/wagmi/index.tsx",
-      "wagmi/chains": "./shims/wagmi/chains.ts",
-      "wagmi/connectors": "./shims/wagmi/connectors.ts",
-      "@privy-io/react-auth": "./shims/privy/react-auth.tsx",
-      "@privy-io/wagmi": "./shims/privy/wagmi.ts",
       "react-native": "./shims/empty-module.ts",
       "@react-native-async-storage/async-storage": "./shims/empty-module.ts",
     },

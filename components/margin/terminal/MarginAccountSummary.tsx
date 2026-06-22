@@ -81,14 +81,19 @@ export default function MarginAccountSummary({
         className,
       )}
     >
-      <Button
-        asChild
-        className="w-full rounded-full bg-primary text-[#121417] font-semibold hover:bg-primary/90"
-      >
-        <Link href="https://faucet.sui.io" target="_blank" rel="noreferrer">
-          Deposit
-        </Link>
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          asChild
+          className="flex-1 rounded-full bg-black/40 text-foreground font-medium text-xs hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Link href="https://faucet.sui.io" target="_blank" rel="noreferrer">
+            Deposit
+          </Link>
+        </Button>
+        <Button className="flex-1 rounded-full bg-black/40 text-foreground font-medium text-xs hover:bg-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-50">
+          Transfer
+        </Button>
+      </div>
 
       <div className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold text-white">Account Health</h3>
@@ -169,7 +174,7 @@ function SummaryRow({
 }) {
   return (
     <div className="flex items-center justify-between text-xs">
-      <span className="text-nav-inactive">{label}</span>
+      <span className="text-white/70">{label}</span>
       <span
         className={cn(
           "tabular-nums text-white",

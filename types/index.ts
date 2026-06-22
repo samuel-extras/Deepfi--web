@@ -18,7 +18,6 @@ export interface UserProfileResponse {
 export interface UserBasicInfo {
   id: string;
   email: string | null;
-  privyId: string | null;
   referralCode: string;
   referredByUserId?: string | null;
   status: string;

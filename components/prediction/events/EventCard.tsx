@@ -97,7 +97,7 @@ export function EventCard({
   ];
 
   return (
-    <Card className={cn("gap-0 transition-all")}>
+    <Card className={cn("gap-0 transition-all bg-transparent")}>
       <CardContent className="flex flex-1 flex-col gap-3">
         {/* Header: asset chip · status · favourite */}
         <div className="flex items-center gap-2">

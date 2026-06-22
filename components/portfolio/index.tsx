@@ -22,8 +22,11 @@ const AssetsTable = dynamic(
 );
 
 export default function Portfolio() {
-  const { userInfo } = useAuthStore();
-  const walletAddress = userInfo.walletAddress || "";
+  const { isAuthenticated, userInfo } = useAuthStore();
+  // Only sync the real signed-in address. When logged out, userInfo.walletAddress
+  // falls back to DEV_ADDRESS (data-read fallback) — syncing it here would
+  // repopulate the persisted balance store (e.g. predictions) after disconnect.
+  const walletAddress = isAuthenticated ? userInfo.walletAddress || "" : "";
 
   // Feed the panels with real DeepBook portfolio data.
   useDeepBookPortfolioSync(walletAddress);

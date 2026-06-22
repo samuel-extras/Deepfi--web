@@ -26,6 +26,9 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
   const setMarginOverview = useBalanceStore(s => s.setMarginOverview);
   const setSpotBalances = useBalanceStore(s => s.setSpotBalances);
   const setPredictionsBalance = useBalanceStore(s => s.setPredictionsBalance);
+  const setPredictionsTradingBalance = useBalanceStore(
+    s => s.setPredictionsTradingBalance
+  );
 
   useEffect(() => {
     if (!walletAddress) return;
@@ -68,6 +71,8 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
         if (cancelled) return;
         const v = pr?.summary?.accountValue;
         if (typeof v === "number") setPredictionsBalance(String(v));
+        const cash = pr?.summary?.tradingBalance;
+        if (typeof cash === "number") setPredictionsTradingBalance(String(cash));
       } catch {
         /* leave predictions as-is */
       }
@@ -79,5 +84,11 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [walletAddress, setMarginOverview, setSpotBalances, setPredictionsBalance]);
+  }, [
+    walletAddress,
+    setMarginOverview,
+    setSpotBalances,
+    setPredictionsBalance,
+    setPredictionsTradingBalance,
+  ]);
 }

@@ -1,6 +1,5 @@
 // Rules / Market context for the oracle — how its binaries & ranges resolve,
-// and the concrete facts of this oracle (param-driven). DeepBook's analogue of
-// the Polymarket "Rules / Market Context" block.
+// and the concrete facts of this oracle (param-driven).
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";

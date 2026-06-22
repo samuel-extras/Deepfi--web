@@ -100,7 +100,7 @@ export function SeriesCard({
   }, [recentMints, memberSet]);
 
   return (
-    <Card className="gap-0 ring-primary/30 transition-all hover:ring-primary/60">
+    <Card className="gap-0 ring-primary/30 transition-all hover:ring-primary/60 bg-linear-to-tr from-[#0a0a0a] to-transparent">
       <style>{`@keyframes dbFloat{0%{opacity:0;transform:translateY(8px)}15%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}`}</style>
 
       <CardContent className="flex flex-col gap-4">

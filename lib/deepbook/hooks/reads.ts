@@ -6,7 +6,7 @@
  * orders + settled funds. Query keys start with `["deepbook"]` so a single
  * invalidate after a trade refreshes them all.
  */
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { normalizeStructTag } from "@mysten/sui/utils";
 import {
@@ -124,4 +124,24 @@ export function useOpenOrders(poolKey: string) {
       };
     },
   });
+}
+
+/**
+ * Live orderbook mid for a pool (shared 3s poll). Call this in the leaf that
+ * needs the mark price instead of prop-drilling it from a parent — the shared
+ * `["deepbook","book",poolKey]` cache means every caller rides one fetch, and
+ * only the leaves that read the mid re-render on each tick.
+ */
+export function useOrderbookMid(poolKey: string): number | null {
+  const q = useQuery({
+    queryKey: ["deepbook", "book", poolKey],
+    refetchInterval: 3_000,
+    placeholderData: keepPreviousData,
+    queryFn: async () =>
+      (await fetch(`/api/deepbook/orderbook?pool=${poolKey}&ticks=100`, {
+        cache: "no-store",
+      }).then(r => r.json())) as { mid: number | null },
+    select: d => d.mid ?? null,
+  });
+  return q.data ?? null;
 }

@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89 80" fill="#05D378">
-  <g transform="translate(-12,-10)">
-    <path d="M12 10 H90 A11 11 0 0 1 90 32 H12 Z"></path>
-    <path d="M12 39 H67 A11 11 0 0 1 67 61 H12 Z"></path>
-    <path d="M12 68 H44 A11 11 0 0 1 44 90 H12 Z"></path>
-  </g>
-</svg>;

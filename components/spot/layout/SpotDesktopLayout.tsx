@@ -42,7 +42,7 @@ export default function SpotDesktopLayout({
   const large = view === "large";
 
   return (
-    <div className="hidden lg:flex flex-col">
+    <div className="hidden lg:flex flex-col bg-[#121417]">
       <div className="grid grid-cols-5 h-[86vh] overflow-hidden">
         <div
           className={cn(

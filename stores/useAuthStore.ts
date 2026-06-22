@@ -1,7 +1,6 @@
 "use client";
 
 import { create } from "zustand";
-import type { User as PrivyUser } from "@privy-io/react-auth";
 import { persist } from "zustand/middleware";
 
 export type AuthType = "email" | "wallet" | null;
@@ -47,7 +46,6 @@ interface AuthActions {
   setConnecting: (connecting: boolean) => void;
   setConnectionError: (error: string | null) => void;
 
-  hydrateFromPrivyUser: (user: PrivyUser) => void;
   setEmbeddedWallet: (address: string) => void;
   loginWithEmail: (email: string) => void;
   loginWithWallet: (walletType: WalletType, walletAddress: string) => void;
@@ -83,54 +81,6 @@ export const useAuthStore = create<AuthState & AuthActions>()(
 
       setConnectorType: type =>
         set({ userInfo: { ...get().userInfo, connectorType: type } }),
-
-      hydrateFromPrivyUser: (user: PrivyUser) => {
-        const email = user?.email?.address as string | undefined;
-        const topWallet = (user?.wallet ?? undefined) as
-          | { address?: string; connectorType?: string }
-          | undefined;
-
-        type LinkedWallet = {
-          type?: string;
-          address?: string;
-          connectorType?: string;
-        };
-        const isLinkedWallet = (a: unknown): a is LinkedWallet => {
-          if (typeof a !== "object" || a === null) return false;
-          const rec = a as Record<string, unknown>;
-          return rec.type === "wallet" && typeof rec.address === "string";
-        };
-        const linkedWallet = Array.isArray(user?.linkedAccounts)
-          ? (user.linkedAccounts.find(isLinkedWallet) as
-              | LinkedWallet
-              | undefined)
-          : undefined;
-        const walletAddress =
-          topWallet?.address ||
-          linkedWallet?.address ||
-          get().userInfo.walletAddress;
-
-        const connector = (topWallet?.connectorType ||
-          linkedWallet?.connectorType) as ConnectorType | undefined;
-        const isEmbedded = connector === "embedded";
-
-        set({
-          authType: email ? "email" : "wallet",
-          isAuthenticated: true,
-          userInfo: {
-            email,
-            walletAddress,
-            walletType: isEmbedded
-              ? "embedded"
-              : (get().userInfo.walletType ?? null),
-            connectorType: isEmbedded
-              ? "embedded"
-              : (connector ?? get().userInfo.connectorType ?? null),
-          },
-          isConnecting: false,
-          connectionError: null,
-        });
-      },
 
       setEmbeddedWallet: (address: string) => {
         set({

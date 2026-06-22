@@ -25,21 +25,6 @@
     "paths": {
       "@/*": [
         "./*"
-      ],
-      "wagmi": [
-        "./shims/wagmi/index.tsx"
-      ],
-      "wagmi/chains": [
-        "./shims/wagmi/chains.ts"
-      ],
-      "wagmi/connectors": [
-        "./shims/wagmi/connectors.ts"
-      ],
-      "@privy-io/react-auth": [
-        "./shims/privy/react-auth.tsx"
-      ],
-      "@privy-io/wagmi": [
-        "./shims/privy/wagmi.ts"
       ]
     }
   },
