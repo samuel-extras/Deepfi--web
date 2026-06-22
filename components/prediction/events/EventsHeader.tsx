@@ -4,7 +4,6 @@
 
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Wallet, ArrowRightLeft, LayoutDashboard } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface EventsHeaderProps {
