@@ -120,7 +120,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
               </div>
               <div className="flex items-center gap-1.5 text-xs text-white font-medium">
                 <div className="h-1.5 w-1.5 rounded-full bg-[#02DA8B] shadow-[0_0_8px_#02DA8B]" />
-                Polygon
+                Sui Testnet
               </div>
             </div>
             <div className="space-y-1.5">
@@ -156,7 +156,7 @@ export const ActivityCard: React.FC<ActivityCardProps> = ({
               </div>
             </div>
             <a
-              href={`https://polygonscan.com/tx/${act.transactionHash}`}
+              href={`https://testnet.suivision.xyz/txblock/${act.transactionHash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 bg-[#02DA8B]/10 hover:bg-[#02DA8B]/20 py-2 px-4 rounded-lg text-[#02DA8B] text-[10px] font-black uppercase transition-all active:scale-95"

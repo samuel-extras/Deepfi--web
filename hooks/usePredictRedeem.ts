@@ -11,6 +11,7 @@ import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute"
 import { toast } from "sonner";
 import { buildRedeemRangeTx, buildRedeemBinaryTx } from "@/lib/ptb/predict";
 import { fromDusdcU64 } from "@/lib/deepbook";
+import { waitForTxSuccess } from "@/lib/sui/txStatus";
 
 export type RedeemRangeArgs = {
   kind: "range";
@@ -75,7 +76,7 @@ export function usePredictRedeem() {
 
         setStatus("Awaiting signature…");
         const res = await signAndExecute({ transaction: tx });
-        await client.waitForTransaction({ digest: res.digest });
+        await waitForTxSuccess(client, res.digest);
         toast.success(`Redeemed · ${res.digest.slice(0, 8)}…`);
         return res.digest;
       } catch (e) {

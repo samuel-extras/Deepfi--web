@@ -22,6 +22,7 @@ import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
 import { COIN_TYPES, OBJECTS, TARGETS, toDusdcU64, toStrikeU64 } from "@/lib/deepbook";
 import { buildCreateManagerTx, addDepositMintRange } from "@/lib/ptb/predict";
+import { waitForTxSuccess } from "@/lib/sui/txStatus";
 
 const DUSDC = COIN_TYPES.dusdc;
 const Q0 = 1_000_000; // probe quantity for linear cost sizing
@@ -108,7 +109,12 @@ export function usePredictMint() {
       if (!rv?.length) throw new Error("Could not price this range (no live quote)");
       const askCost = Number(bcs.U64.parse(Uint8Array.from(rv[0][0])));
       if (askCost <= 0) throw new Error("Range not currently mintable");
-      const qty = Math.floor((Number(toDusdcU64(a.amountDusdc)) * Q0) / askCost);
+      // Size against 99% of the deposit: rolling oracles re-quote ~1/sec, so the
+      // execution ask price can drift above this devInspect quote. Without a
+      // buffer the mint cost exceeds the exact deposit and the PTB aborts. The
+      // unspent ~1% stays in the manager balance (withdrawable), not lost.
+      const budget = Number(toDusdcU64(a.amountDusdc)) * 0.99;
+      const qty = Math.floor((budget * Q0) / askCost);
       if (qty <= 0) throw new Error("Amount too small for this range");
       return String(qty);
     },
@@ -162,7 +168,7 @@ export function usePredictMint() {
 
         setStatus("Awaiting signature…");
         const res = await signAndExecute({ transaction: tx });
-        await client.waitForTransaction({ digest: res.digest });
+        await waitForTxSuccess(client, res.digest);
         toast.success(`Minted ${a.amountDusdc} dUSDC range · ${res.digest.slice(0, 8)}…`);
         return res.digest;
       } catch (e) {

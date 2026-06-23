@@ -9,15 +9,23 @@ interface ClosedPositionCardProps {
   pos: any;
   formatCurrency: (val?: number) => string;
   onShare: (pos: any) => void;
+  onRedeem?: (pos: any) => void;
+  isRedeeming?: boolean;
 }
 
 export const ClosedPositionCard: React.FC<ClosedPositionCardProps> = ({
   pos,
   formatCurrency,
   onShare,
+  onRedeem,
+  isRedeeming,
 }) => {
   const closedDate = pos.timestamp ? new Date(pos.timestamp * 1000) : null;
-  const isWon = (pos.realizedPnl || 0) > 0;
+  // For settled-but-unredeemed positions the headline P&L is the payout still
+  // on the table (cashPnl); otherwise use the booked realizedPnl.
+  const headlinePnl = pos.redeemable ? (pos.cashPnl ?? 0) : (pos.realizedPnl ?? 0);
+  const isWon = headlinePnl > 0;
+  const canRedeem = pos.redeemable && typeof onRedeem === "function";
 
   return (
     <div className="bg-[#1E2024]/40 border border-white/5 rounded-md p-3  group hover:border-white/10 transition-all shadow-xl">
@@ -67,20 +75,18 @@ export const ClosedPositionCard: React.FC<ClosedPositionCardProps> = ({
               {pos.outcome || (pos.outcomeIndex === 0 ? "Yes" : "No")}
             </div>
             <div className="text-[11px] text-[#6B7280] font-medium">
-              Realized P&L
+              {pos.redeemable ? "Payout to Redeem" : "Realized P&L"}
             </div>
           </div>
           <div className="text-right space-y-1">
             <div
               className={cn(
                 "text-xl font-bold tabular-nums",
-                (pos.realizedPnl || 0) >= 0
-                  ? "text-[#02DA8B]"
-                  : "text-[#FF5C5C]"
+                headlinePnl >= 0 ? "text-[#02DA8B]" : "text-[#FF5C5C]"
               )}
             >
-              {(pos.realizedPnl || 0) >= 0 ? "+" : ""}
-              {formatCurrency(pos.realizedPnl)}
+              {headlinePnl >= 0 ? "+" : ""}
+              {formatCurrency(headlinePnl)}
             </div>
             <div className="text-[10px] text-[#6B7280] font-medium">
               Return: {(pos.percentPnl || 0).toFixed(2)}%
@@ -96,14 +102,25 @@ export const ClosedPositionCard: React.FC<ClosedPositionCardProps> = ({
               ? format(closedDate, "MMM d, yyyy 'at' h:mm a")
               : "Finished"}
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onShare(pos)}
-            className="h-8 w-8 rounded-full bg-white/5 hover:bg-white/10 text-white transition-all active:scale-90"
-          >
-            <Share2 className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {canRedeem && (
+              <Button
+                onClick={() => onRedeem!(pos)}
+                disabled={isRedeeming}
+                className="bg-[#02DA8B] hover:bg-[#02DA8B]/90 text-black border-none px-6 h-8 rounded-full font-bold text-xs transition-all active:scale-95 disabled:opacity-60"
+              >
+                {isRedeeming ? "Redeeming…" : "Redeem"}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onShare(pos)}
+              className="h-8 w-8 rounded-full bg-white/5 hover:bg-white/10 text-white transition-all active:scale-90"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

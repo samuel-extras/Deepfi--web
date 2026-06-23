@@ -27,9 +27,10 @@ export const ActivePositionCard: React.FC<ActivePositionCardProps> = ({
   const isPositive = pnl > 0.004; // 0.005 would round to $0.01
   const isNeutral = Math.abs(pnl) < 0.005;
 
-  // All events now use the unified /prediction/events/[slug] route
+  // Predict positions link straight to their single-market page; fall back to
+  // the legacy events route only when no explicit href is supplied.
   const slugOrId = pos.eventSlug || pos.slug;
-  const href = `/prediction/events/${slugOrId}`;
+  const href = pos.href || `/prediction/events/${slugOrId}`;
 
   return (
     <div className="bg-[#1E2024]/40 border border-white/5 rounded-2xl p-3 backdrop-blur-md group hover:border-[#02DA8B]/20 transition-all shadow-md">

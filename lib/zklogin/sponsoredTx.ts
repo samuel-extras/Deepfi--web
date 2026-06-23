@@ -63,8 +63,19 @@ export async function sponsorAndExecute(opts: {
   const res = await client.executeTransactionBlock({
     transactionBlock: bytes,
     signature: [userSignature, sponsorSignature],
-    options: { showRawEffects: true },
+    options: { showRawEffects: true, showEffects: true },
   });
+
+  // A Move abort still returns a digest with status "failure" — surface it so
+  // callers don't report a false success on a reverted transaction.
+  const status = res.effects?.status;
+  if (status && status.status !== "success") {
+    throw new Error(
+      status.error
+        ? `Transaction reverted on-chain: ${status.error}`
+        : "Transaction reverted on-chain",
+    );
+  }
 
   return {
     digest: res.digest,
