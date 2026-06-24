@@ -18,7 +18,7 @@ async function fetchLive(url: string, map: (j: unknown) => Candle[]): Promise<Ca
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 6000);
   try {
-    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "deepfi/1.0" } });
+    const r = await fetch(url, { signal: ctrl.signal, headers: { "User-Agent": "deepcast/1.0" } });
     if (!r.ok) throw new Error(String(r.status));
     return map(await r.json());
   } finally {

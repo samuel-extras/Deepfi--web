@@ -21,15 +21,15 @@ export async function generateMetadata({
 
   if (!detail) {
     return withDefaultMetadata({
-      title: "Competition | DEX",
-      description: "View trading competitions on DEX.",
+      title: "Competition | Deepcast",
+      description: "View trading competitions on Deepcast.",
     });
   }
 
-  const title = `${detail.name} | DEX`;
+  const title = `${detail.name} | Deepcast`;
   const description =
     detail.description?.slice(0, 160) ||
-    "Competition details and leaderboard on DEX.";
+    "Competition details and leaderboard on Deepcast.";
 
   return withDefaultMetadata({
     title,

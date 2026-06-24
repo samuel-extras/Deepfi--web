@@ -29,6 +29,9 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
   const setPredictionsTradingBalance = useBalanceStore(
     s => s.setPredictionsTradingBalance
   );
+  // Bumped by requestRefresh() (e.g. after a transfer) to force an immediate
+  // re-sync instead of waiting for the 15s interval.
+  const refreshSeq = useBalanceStore(s => s.refreshSeq);
 
   useEffect(() => {
     if (!walletAddress) return;
@@ -86,6 +89,7 @@ export function useDeepBookPortfolioSync(walletAddress: string) {
     };
   }, [
     walletAddress,
+    refreshSeq,
     setMarginOverview,
     setSpotBalances,
     setPredictionsBalance,

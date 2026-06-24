@@ -1,12 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ArrowLeftRight } from "lucide-react";
 import {
   useMarginOverview,
   useSpotBalances,
   usePredictionsBalance,
 } from "@/stores/useBalanceStore";
+import { useWalletUsd } from "@/hooks/useWalletUsd";
 import { formatNumber } from "@/lib/format";
+import { TransferModal } from "@/components/wallet/TransferModal";
 
 const usd = (value: number) =>
   formatNumber(value, "price", {
@@ -17,9 +20,13 @@ const usd = (value: number) =>
   });
 
 const PortfolioSummary = () => {
+  const [transferOpen, setTransferOpen] = useState(false);
   const marginOverview = useMarginOverview();
   const spotBalances = useSpotBalances();
   const predictionsBalance = parseFloat(usePredictionsBalance() || "0");
+  // Loose coins in the wallet address (priced to USD), disjoint from the
+  // manager accounts below.
+  const { walletUsd } = useWalletUsd();
 
   const { spotBalance, marginEquity, marginDebt, totalAssets } =
     useMemo(() => {
@@ -32,8 +39,8 @@ const PortfolioSummary = () => {
       const equity = parseFloat(marginOverview?.accountValue || "0");
       const debt = parseFloat(marginOverview?.totalDebt || "0");
 
-      // Total assets = spot + margin equity + predictions
-      const total = spot + equity + predictionsBalance;
+      // Total assets = wallet + spot + margin equity + predictions
+      const total = walletUsd + spot + equity + predictionsBalance;
 
       return {
         spotBalance: spot,
@@ -41,16 +48,17 @@ const PortfolioSummary = () => {
         marginDebt: debt,
         totalAssets: total,
       };
-    }, [marginOverview, spotBalances, predictionsBalance]);
+    }, [marginOverview, spotBalances, predictionsBalance, walletUsd]);
 
   const accountData = useMemo(
     () => [
+      { title: "Wallet", value: usd(walletUsd) },
       { title: "Spot Balance", value: usd(spotBalance) },
       { title: "Margin Equity", value: usd(marginEquity) },
       { title: "Margin Debt", value: usd(marginDebt) },
       { title: "Predictions Balance", value: usd(predictionsBalance) },
     ],
-    [spotBalance, marginEquity, marginDebt, predictionsBalance]
+    [walletUsd, spotBalance, marginEquity, marginDebt, predictionsBalance]
   );
 
   return (
@@ -62,7 +70,21 @@ const PortfolioSummary = () => {
           </p>
           <h1 className="text-2xl text-white font-bold">{usd(totalAssets)}</h1>
         </div>
+        <button
+          type="button"
+          onClick={() => setTransferOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full border border-border bg-transparent px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/5"
+        >
+          <ArrowLeftRight className="size-3.5 text-[#02DA8B]" />
+          Transfer
+        </button>
       </div>
+
+      <TransferModal
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        defaultVenue="predictions"
+      />
 
       <div className="grid grid-cols-2 gap-3 w-full">
         {accountData.map(item => (

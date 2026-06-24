@@ -1,7 +1,7 @@
 import ComboTrade from "@/components/prediction/ComboTrade";
 
 export const metadata = {
-  title: "Combo Trade — DeepFi",
+  title: "Combo Trade — Deepcast",
   description:
     "Execute a three-protocol atomic PTB spanning DeepBook Margin, DeepBook Predict, and the PLP vault.",
 };

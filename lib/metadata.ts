@@ -8,18 +8,19 @@ import {
   parseTradeRouteParams,
 } from "./utils/urlParsing";
 
-const siteName = "DEX";
-const defaultTitle = "DEX – Seamless Perpetual Trading with Deep Liquidity";
+const siteName = "Deepcast";
+const defaultTitle =
+  "Deepcast — On-chain Prediction Markets & DeFi on Sui";
 const defaultDescription =
-  "Experience next-level crypto trading on DEX. Access deep liquidity, lightning-fast execution, and fully transparent pricing for perpetual contracts.";
+  "Trade vol-surface-priced prediction markets on Sui with Deepcast — composed end-to-end with DeepBook spot, margin, and the PLP vault. Powered by DeepBook Predict.";
 const defaultKeywords = [
-  "crypto trading",
-  "perpetual contracts",
-  "DEX",
-  "futures trading",
+  "prediction markets",
+  "DeepBook Predict",
+  "Sui",
+  "dUSDC",
   "on-chain trading",
-  "fast execution",
-  "transparent pricing",
+  "vol surface",
+  "DeFi",
 ];
 
 const defaultImages = [
@@ -51,9 +52,9 @@ export const baseMetadata: Metadata = {
     images: defaultImages.map(image => image.url),
   },
   icons: {
-    icon: "/dex.svg",
-    shortcut: "/dex.svg",
-    apple: "/dex.svg",
+    icon: "/deepcast-app-icon.svg",
+    shortcut: "/deepcast-app-icon.svg",
+    apple: "/deepcast-app-icon.png",
   },
 };
 
@@ -131,7 +132,7 @@ export async function buildTradeMetadata({
     isSpot: marketType === MARKET_TYPES.SPOT,
   });
 
-  const description = `Trade ${formattedBase} on DEX with live depth, mark prices, and fast execution.`;
+  const description = `Trade ${formattedBase} on Deepcast with live depth, mark prices, and fast execution.`;
 
   return withDefaultMetadata({
     title,

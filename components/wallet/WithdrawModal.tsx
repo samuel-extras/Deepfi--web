@@ -1,14 +1,15 @@
 "use client";
 
 /**
- * Withdraw modal (web) — faithful port of the mobile "Withdraw USDC" sheet.
- * Pick a source bucket (DeFi / Exchange / Predictions), an asset + network, an
- * amount (with MAX), and a destination address. Controlled via open/onOpenChange.
+ * Withdraw modal (web) — Sui-native rework of the old mobile "Withdraw USDC"
+ * sheet. deepfi settles entirely on Sui in dUSDC, so there's no asset/network
+ * picker: pick a source venue (Spot / Margin / Predictions), an amount (with
+ * MAX), and a Sui destination address. Controlled via open/onOpenChange.
  *
- * ponytail: the asset/network lists + the withdraw action are presentational —
- * deepfi is Sui-native, so cross-chain routing isn't wired. Bucket balances are
- * real (same selectors as the navbar). Wire `onWithdraw` to a PTB when the
- * withdraw path is defined.
+ * Bucket balances are real (same selectors as the navbar). ponytail: the
+ * withdraw action is presentational — wire `onWithdraw` to a Sui PTB
+ * (margin::withdraw / predict withdraw / spot balance-manager withdraw) once the
+ * per-venue withdraw path is defined.
  */
 import * as React from "react";
 import {
@@ -19,37 +20,24 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { TokenIcon } from "@/components/ui/token-icon";
-import { ChevronDown, Box, ArrowLeftRight, Dices, X } from "lucide-react";
+import { RefreshCw, TrendingUp, Dices, X, type LucideIcon } from "lucide-react";
 import { useSuiClientQuery } from "@mysten/dapp-kit";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { COIN_TYPES } from "@/lib/deepbook";
+import { COIN_TYPES, SUI_NETWORK } from "@/lib/deepbook";
 import { useSpotBalances, useMarginOverview } from "@/stores/useBalanceStore";
 import { toast } from "sonner";
 
-const ASSETS = [
-  "USDC",
-  "BTC",
-  "ETH",
-  "SOL",
-  "FARTCOIN",
-  "kBONK",
-  "USDC.e",
-  "pUSD",
-] as const;
+const ASSET = "dUSDC";
+const NETWORK_LABEL = `Sui ${SUI_NETWORK[0].toUpperCase()}${SUI_NETWORK.slice(1)}`;
 
-const NETWORKS = ["Arbitrum", "Ethereum", "Base"] as const;
+// Normalized Sui addresses are 0x + 32 bytes (64 hex chars).
+const SUI_ADDRESS_RE = /^0x[0-9a-fA-F]{64}$/;
 
 const usd = (n: number) =>
   n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Bucket = { key: string; label: string; icon: typeof Box; unit: string; value: number };
+type Bucket = { key: string; label: string; icon: LucideIcon; value: number };
 
 export function WithdrawModal({
   open,
@@ -61,7 +49,7 @@ export function WithdrawModal({
   const account = useActiveAccount();
   const owner = account?.address;
 
-  // Real bucket balances — same sources as the navbar dropdown (react-query
+  // Real venue balances — same sources as the navbar dropdown (react-query
   // dedupes the dUSDC read by key, so reading it here is free).
   const dusdcQ = useSuiClientQuery(
     "getBalance",
@@ -73,23 +61,21 @@ export function WithdrawModal({
   const marginUsd = Number(useMarginOverview()?.accountValue ?? 0);
 
   const buckets: Bucket[] = [
-    { key: "defi", label: "DeFi", icon: Box, unit: "USDC", value: 0 },
-    { key: "exchange", label: "Exchange", icon: ArrowLeftRight, unit: "USDC", value: spotUsd + marginUsd },
-    { key: "predictions", label: "Predictions", icon: Dices, unit: "pUSD", value: predictUsd },
+    { key: "spot", label: "Spot", icon: RefreshCw, value: spotUsd },
+    { key: "margin", label: "Margin", icon: TrendingUp, value: marginUsd },
+    { key: "predictions", label: "Predictions", icon: Dices, value: predictUsd },
   ];
 
-  const [bucketKey, setBucketKey] = React.useState("exchange");
-  const [asset, setAsset] = React.useState<string>("USDC");
-  const [network, setNetwork] = React.useState<string>("Arbitrum");
+  const [bucketKey, setBucketKey] = React.useState("predictions");
   const [amount, setAmount] = React.useState("");
   const [address, setAddress] = React.useState("");
 
-  const bucket = buckets.find((b) => b.key === bucketKey) ?? buckets[1];
+  const bucket = buckets.find((b) => b.key === bucketKey) ?? buckets[0];
 
+  const amountNum = Number(amount);
+  const overBalance = amountNum > bucket.value;
   const valid =
-    Number(amount) > 0 &&
-    Number(amount) <= bucket.value &&
-    /^0x[0-9a-fA-F]{2,}/.test(address.trim());
+    amountNum > 0 && !overBalance && SUI_ADDRESS_RE.test(address.trim());
 
   const paste = async () => {
     try {
@@ -101,8 +87,10 @@ export function WithdrawModal({
   };
 
   const onWithdraw = () => {
-    // ponytail: no Sui withdraw path defined yet — surface intent, don't fake a tx.
-    toast.info(`Withdraw ${amount} ${asset} → ${address.slice(0, 10)}… (not yet wired)`);
+    // ponytail: no Sui withdraw PTB wired yet — surface intent, don't fake a tx.
+    toast.info(
+      `Withdraw ${amount} ${ASSET} from ${bucket.label} → ${address.slice(0, 10)}… (not yet wired)`,
+    );
   };
 
   return (
@@ -113,7 +101,7 @@ export function WithdrawModal({
       >
         <DialogHeader className="relative mb-4 flex-row items-center justify-center">
           <DialogTitle className="text-lg font-bold text-white">
-            Withdraw {asset}
+            Withdraw {ASSET}
           </DialogTitle>
           <button
             type="button"
@@ -125,7 +113,7 @@ export function WithdrawModal({
           </button>
         </DialogHeader>
 
-        {/* source buckets */}
+        {/* source venues */}
         <div className="grid grid-cols-3 overflow-hidden rounded-xl border border-white/5">
           {buckets.map((b, i) => {
             const active = b.key === bucketKey;
@@ -149,67 +137,45 @@ export function WithdrawModal({
                 <span
                   className={`text-sm tabular-nums ${active ? "text-white" : "text-[#6B7280]"}`}
                 >
-                  {usd(b.value)} {b.unit}
+                  {usd(b.value)} {ASSET}
                 </span>
               </button>
             );
           })}
         </div>
 
-        {/* asset + network */}
+        {/* asset + network — fixed on Sui, shown for clarity */}
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Selector label="Asset">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="flex w-full items-center gap-2">
-                  <TokenIcon symbol={asset} size={22} />
-                  <span className="text-base font-semibold text-white">{asset}</span>
-                  <ChevronDown className="ml-auto size-4 text-[#6B7280]" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-white/5 bg-[#1E2024] p-1">
-                {ASSETS.map((a) => (
-                  <DropdownMenuItem
-                    key={a}
-                    onClick={() => setAsset(a)}
-                    className="gap-2.5 rounded-lg py-2 text-white focus:bg-white/5"
-                  >
-                    <TokenIcon symbol={a} size={22} />
-                    <span className="text-base font-medium">{a}</span>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </Selector>
+          <InfoTile label="Asset">
+            <div className="flex w-full items-center gap-2">
+              <TokenIcon symbol="USDC" size={22} />
+              <span className="text-base font-semibold text-white">{ASSET}</span>
+            </div>
+          </InfoTile>
 
-          <Selector label="Network">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="flex w-full items-center gap-2">
-                  <TokenIcon symbol={network.slice(0, 3).toUpperCase()} size={22} />
-                  <span className="text-base font-semibold text-white">{network}</span>
-                  <ChevronDown className="ml-auto size-4 text-[#6B7280]" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border-white/5 bg-[#1E2024] p-1">
-                {NETWORKS.map((n) => (
-                  <DropdownMenuItem
-                    key={n}
-                    onClick={() => setNetwork(n)}
-                    className="rounded-lg py-2 text-base font-medium text-white focus:bg-white/5"
-                  >
-                    {n}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </Selector>
+          <InfoTile label="Network">
+            <div className="flex w-full items-center gap-2">
+              <TokenIcon symbol="SUI" size={22} />
+              <span className="text-base font-semibold text-white">
+                {NETWORK_LABEL}
+              </span>
+            </div>
+          </InfoTile>
         </div>
 
         {/* amount */}
         <div className="mt-3">
-          <label className="text-sm text-[#6B7280]">Amount</label>
-          <div className="mt-1.5 flex items-center rounded-xl border border-white/5 bg-[#1A1C1F] px-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-[#6B7280]">Amount</label>
+            <span className="text-xs tabular-nums text-[#6B7280]">
+              Available {usd(bucket.value)} {ASSET}
+            </span>
+          </div>
+          <div
+            className={`mt-1.5 flex items-center rounded-xl border bg-[#1A1C1F] px-4 ${
+              overBalance ? "border-red-500/60" : "border-white/5"
+            }`}
+          >
             <Input
               inputMode="decimal"
               value={amount}
@@ -217,7 +183,7 @@ export function WithdrawModal({
               placeholder="0"
               className="h-12 border-0 bg-transparent px-0 text-base text-white shadow-none focus-visible:ring-0"
             />
-            <span className="text-sm font-medium text-[#6B7280]">{asset}</span>
+            <span className="text-sm font-medium text-[#6B7280]">{ASSET}</span>
             <button
               type="button"
               onClick={() => setAmount(String(bucket.value))}
@@ -226,6 +192,11 @@ export function WithdrawModal({
               MAX
             </button>
           </div>
+          {overBalance ? (
+            <p className="mt-1.5 text-xs text-red-400">
+              Amount exceeds your {bucket.label} balance.
+            </p>
+          ) : null}
         </div>
 
         {/* destination */}
@@ -235,13 +206,22 @@ export function WithdrawModal({
             <Input
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="0x..."
+              placeholder="0x… (Sui address)"
               className="h-12 border-0 bg-transparent px-0 text-base text-white shadow-none focus-visible:ring-0"
             />
+            {owner ? (
+              <button
+                type="button"
+                onClick={() => setAddress(owner)}
+                className="ml-2 shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-white/5"
+              >
+                My address
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={paste}
-              className="ml-3 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-white/5"
+              className="ml-2 shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-white/5"
             >
               Paste
             </button>
@@ -254,19 +234,20 @@ export function WithdrawModal({
           onClick={onWithdraw}
           className="mx-auto mt-6 h-12 w-[60%] rounded-full bg-[#02DA8B] text-base font-bold text-black hover:bg-[#02DA8B]/90 disabled:bg-[#02DA8B]/25 disabled:text-black/40"
         >
-          Withdraw {asset}
+          Withdraw {ASSET}
         </Button>
 
         <div className="mt-5 rounded-xl border border-[#B5893C]/40 bg-[#B5893C]/10 px-4 py-3 text-center text-sm leading-relaxed text-[#E0B25C]">
-          If you have USDC in your Spot Balances, transfer to Perps to make it
-          available to withdraw. Withdrawals should arrive within 5 minutes.
+          Withdrawals are sent on {NETWORK_LABEL} as {ASSET} to the address above.
+          Sui transfers are irreversible — double-check the destination before
+          confirming.
         </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Selector({
+function InfoTile({
   label,
   children,
 }: {

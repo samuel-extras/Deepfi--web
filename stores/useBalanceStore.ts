@@ -35,6 +35,12 @@ interface BalanceState {
   predictionsBalance: string;
   /** Spendable (uncommitted) dUSDC inside the Predict manager, in USD. */
   predictionsTradingBalance: string;
+  /**
+   * Monotonic counter bumped to request an out-of-band re-sync (e.g. right
+   * after a transfer) so venue balances refresh without waiting for the poll.
+   * Not persisted — it's an ephemeral signal.
+   */
+  refreshSeq: number;
 }
 
 interface BalanceActions {
@@ -42,6 +48,8 @@ interface BalanceActions {
   setSpotBalances: (balances: SpotBalance[]) => void;
   setPredictionsBalance: (balance: string) => void;
   setPredictionsTradingBalance: (balance: string) => void;
+  /** Trigger an immediate balance re-sync (see useDeepBookPortfolioSync). */
+  requestRefresh: () => void;
   reset: () => void;
 }
 
@@ -50,6 +58,7 @@ const initialState: BalanceState = {
   spotBalances: [],
   predictionsBalance: "0.00",
   predictionsTradingBalance: "0.00",
+  refreshSeq: 0,
 };
 
 export const useBalanceStore = create<BalanceState & BalanceActions>()(
@@ -73,6 +82,10 @@ export const useBalanceStore = create<BalanceState & BalanceActions>()(
         set({ predictionsTradingBalance: balance });
       },
 
+      requestRefresh: () => {
+        set(state => ({ refreshSeq: state.refreshSeq + 1 }));
+      },
+
       reset: () => {
         set(initialState);
       },
@@ -94,6 +107,9 @@ export const usePredictionsBalance = () =>
 
 export const usePredictionsTradingBalance = () =>
   useBalanceStore(state => state.predictionsTradingBalance);
+
+export const useBalanceRefreshSeq = () =>
+  useBalanceStore(state => state.refreshSeq);
 
 export const useMarginOverview = () =>
   useBalanceStore(state => state.marginOverview);

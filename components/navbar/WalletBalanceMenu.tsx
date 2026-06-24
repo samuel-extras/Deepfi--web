@@ -9,7 +9,6 @@
  * (it otherwise only runs on /portfolio). Reads dUSDC via getBalance.
  */
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,20 +27,25 @@ import {
   ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
-import { useSuiClientQuery } from "@mysten/dapp-kit";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { COIN_TYPES } from "@/lib/deepbook";
+import { DUSDC_FAUCET_URL } from "@/lib/deepbook";
 import { useDeepBookPortfolioSync } from "@/hooks/useDeepBookPortfolioSync";
-import { useSpotBalances, useMarginOverview } from "@/stores/useBalanceStore";
+import { useWalletUsd } from "@/hooks/useWalletUsd";
+import {
+  useSpotBalances,
+  useMarginOverview,
+  usePredictionsBalance,
+} from "@/stores/useBalanceStore";
 import { WithdrawModal } from "@/components/wallet/WithdrawModal";
+import { TransferModal } from "@/components/wallet/TransferModal";
 
 const usd = (n: number) =>
   `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function WalletBalanceMenu() {
-  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [withdrawOpen, setWithdrawOpen] = React.useState(false);
+  const [transferOpen, setTransferOpen] = React.useState(false);
 
   const account = useActiveAccount();
   const owner = account?.address;
@@ -49,24 +53,19 @@ export function WalletBalanceMenu() {
   // Keep the balance store fresh wherever the navbar is shown (signed in).
   useDeepBookPortfolioSync(owner ?? "");
 
-  // dUSDC is the Predict quote asset (and only used there) — the wallet dUSDC
-  // balance IS the prediction balance. ponytail: add PredictManager-committed
-  // value (usePredictionsBalance) if "deposited" should count too.
-  const dusdcQ = useSuiClientQuery(
-    "getBalance",
-    { owner: owner ?? "", coinType: COIN_TYPES.dusdc },
-    { enabled: !!owner, refetchInterval: 15_000 },
-  );
-  const predictUsd = Number(dusdcQ.data?.totalBalance ?? 0) / 1e6;
-
-  // USD value of assets held per venue (manager object).
+  // USD value of every place the user holds assets. Wallet = loose coins in the
+  // address; Spot/Margin/Predictions = the manager accounts. Predictions uses
+  // the PredictManager account value (cash + open positions). All disjoint, so
+  // the sum is the user's true total — same definition as /portfolio.
+  const { walletUsd } = useWalletUsd();
   const spotUsd = useSpotBalances().reduce(
     (s, b) => s + Number(b.entryNtl || 0),
     0,
   );
   const marginUsd = Number(useMarginOverview()?.accountValue ?? 0);
+  const predictUsd = Number(usePredictionsBalance() || 0);
 
-  const total = spotUsd + marginUsd + predictUsd;
+  const total = walletUsd + spotUsd + marginUsd + predictUsd;
 
   const rows: {
     icon: LucideIcon;
@@ -74,15 +73,11 @@ export function WalletBalanceMenu() {
     hint?: string;
     value: number;
   }[] = [
+    { icon: Wallet, label: "Wallet", value: walletUsd },
     { icon: RefreshCw, label: "Spot", value: spotUsd },
     { icon: TrendingUp, label: "Margin", value: marginUsd },
-    { icon: Dices, label: "Predictions", hint: "dUSDC", value: predictUsd },
+    { icon: Dices, label: "Predictions", value: predictUsd },
   ];
-
-  const go = (href: string) => {
-    setOpen(false);
-    router.push(href);
-  };
 
   return (
     <>
@@ -142,7 +137,10 @@ export function WalletBalanceMenu() {
           {/* actions */}
           <div className="grid grid-cols-3 gap-2">
             <Button
-              onClick={() => go("/portfolio")}
+              onClick={() => {
+                setOpen(false);
+                window.open(DUSDC_FAUCET_URL, "_blank", "noopener,noreferrer");
+              }}
               className="h-9 gap-1.5 rounded-xl bg-[#02DA8B] text-xs font-bold text-black hover:bg-[#02DA8B]/90"
             >
               <ArrowDownToLine className="size-3.5" />
@@ -161,7 +159,10 @@ export function WalletBalanceMenu() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => go("/portfolio")}
+              onClick={() => {
+                setOpen(false);
+                setTransferOpen(true);
+              }}
               className="h-9 gap-1.5 rounded-xl border-white/10 bg-transparent text-xs font-semibold text-white hover:bg-white/5"
             >
               <ArrowLeftRight className="size-3.5" />
@@ -171,6 +172,11 @@ export function WalletBalanceMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
       <WithdrawModal open={withdrawOpen} onOpenChange={setWithdrawOpen} />
+      <TransferModal
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        defaultVenue="predictions"
+      />
     </>
   );
 }

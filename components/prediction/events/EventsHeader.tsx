@@ -1,4 +1,3 @@
-// Carried from dex prediction/events EventsHeader. Presentational — the parent
 // passes the real wallet balance (the user's dUSDC) and a transfer handler.
 "use client";
 
