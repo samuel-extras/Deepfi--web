@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSuiClient, useSuiClientQuery } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { toast } from "sonner";
 import {
@@ -81,6 +82,7 @@ export default function EarnVault() {
   const owner = account?.address;
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
 
   const [amount, setAmount] = useState("10");
   const [isPending, setIsPending] = useState(false);
@@ -158,6 +160,7 @@ export default function EarnVault() {
       });
       await client.waitForTransaction({ digest: res.digest });
       toast.success(`Supplied ${amt} dUSDC · received PLP shares`);
+      refreshAfterTx();
       void plpQ.refetch();
       void summaryQ.refetch();
     } catch (e) {

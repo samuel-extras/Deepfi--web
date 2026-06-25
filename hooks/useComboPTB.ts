@@ -15,6 +15,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -81,6 +82,7 @@ export function useComboPTB() {
   const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -313,6 +315,7 @@ export function useComboPTB() {
         toast.success(
           `Combo PTB executed · ${res.digest.slice(0, 10)}…`,
         );
+        refreshAfterTx();
         return { digest: res.digest, marginManagerId };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -328,6 +331,7 @@ export function useComboPTB() {
       signAndExecute,
       ensurePredictManager,
       sizeRangeQuantity,
+      refreshAfterTx,
     ],
   );
 

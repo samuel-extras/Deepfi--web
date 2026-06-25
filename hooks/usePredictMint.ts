@@ -17,6 +17,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ export function usePredictMint() {
   const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isMinting, setIsMinting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   // Cache the manager id for the session — prevents duplicate creation when
@@ -170,6 +172,7 @@ export function usePredictMint() {
         const res = await signAndExecute({ transaction: tx });
         await waitForTxSuccess(client, res.digest);
         toast.success(`Minted ${a.amountDusdc} dUSDC range · ${res.digest.slice(0, 8)}…`);
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -179,7 +182,7 @@ export function usePredictMint() {
         setStatus(null);
       }
     },
-    [account?.address, client, signAndExecute, ensureManager, sizeQuantity]
+    [account?.address, client, signAndExecute, ensureManager, sizeQuantity, refreshAfterTx]
   );
 
   return { mint, isMinting, status, isConnected: Boolean(account?.address) };

@@ -17,11 +17,10 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
-import { useQueryClient } from "@tanstack/react-query";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
 import { toast } from "sonner";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { useBalanceStore } from "@/stores/useBalanceStore";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { useSpotActions } from "@/lib/deepbook/hooks/useSpotActions";
 import { useBalanceManager } from "@/lib/deepbook/hooks/account";
 import { DEFAULT_POOL_KEY } from "@/lib/deepbook/core";
@@ -64,31 +63,9 @@ function humanizePredict(error: string | undefined): string {
 export function useVenueTransfer() {
   const account = useActiveAccount();
   const client = useSuiClient();
-  const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const requestRefresh = useBalanceStore((s) => s.requestRefresh);
-
-  /**
-   * Pull fresh balances right after a confirmed transfer so the venue cards and
-   * wallet figures update immediately instead of on the 15s poll. Indexers lag
-   * a confirmed tx by a beat, so re-pull a couple more times.
-   */
-  const refreshBalances = useCallback(() => {
-    const run = () => {
-      // venue store (indexer-backed: /api/deepbook/portfolio + /api/portfolio)
-      requestRefresh();
-      // wallet coin balances — dapp-kit getBalance queries (full-node reads)
-      queryClient.invalidateQueries({
-        predicate: (q) =>
-          Array.isArray(q.queryKey) && q.queryKey[1] === "getBalance",
-      });
-      // DeepBook SDK reads (spot/margin account panels)
-      queryClient.invalidateQueries({ queryKey: ["deepbook"] });
-    };
-    run();
-    setTimeout(run, 2500);
-    setTimeout(run, 6000);
-  }, [queryClient, requestRefresh]);
+  // Refresh every balance / position / wallet source after a confirmed transfer.
+  const refreshBalances = useRefreshAfterTx();
 
   // Spot venue — DeepBook BalanceManager deposit/withdraw (DBUSDC).
   const spot = useSpotActions(DEFAULT_POOL_KEY);

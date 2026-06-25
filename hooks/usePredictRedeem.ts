@@ -8,9 +8,9 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { toast } from "sonner";
 import { buildRedeemRangeTx, buildRedeemBinaryTx } from "@/lib/ptb/predict";
-import { fromDusdcU64 } from "@/lib/deepbook";
 import { waitForTxSuccess } from "@/lib/sui/txStatus";
 
 export type RedeemRangeArgs = {
@@ -39,6 +39,7 @@ export function usePredictRedeem() {
   const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isRedeeming, setIsRedeeming] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -78,6 +79,7 @@ export function usePredictRedeem() {
         const res = await signAndExecute({ transaction: tx });
         await waitForTxSuccess(client, res.digest);
         toast.success(`Redeemed · ${res.digest.slice(0, 8)}…`);
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -87,7 +89,7 @@ export function usePredictRedeem() {
         setStatus(null);
       }
     },
-    [account?.address, client, signAndExecute],
+    [account?.address, client, signAndExecute, refreshAfterTx],
   );
 
   return { redeem, isRedeeming, status, isConnected: Boolean(account?.address) };

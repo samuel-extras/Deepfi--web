@@ -1,6 +1,7 @@
-import PredictionList from "@/components/prediction/Predictions";
+import PredictionView from "@/components/prediction/PredictionView";
 
-// DeepBook Predict — markets listing (the prediction home).
+// DeepBook Predict — markets listing (the prediction home). The view (classic
+// list vs pro terminal) is chosen by the navbar setting; see PredictionView.
 export const metadata = {
   title: "Prediction Markets",
   description:
@@ -8,5 +9,5 @@ export const metadata = {
 };
 
 export default function PredictionPage() {
-  return <PredictionList />;
+  return <PredictionView />;
 }

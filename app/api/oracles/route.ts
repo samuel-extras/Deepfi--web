@@ -23,6 +23,7 @@ const toDTO = (o: OracleRow) => ({
   tickSize: fromPriceU64(o.tick_size),
   settlementPrice:
     o.settlement_price != null ? fromPriceU64(o.settlement_price) : null,
+  activatedAt: o.activated_at ?? null,
 });
 
 export async function GET() {

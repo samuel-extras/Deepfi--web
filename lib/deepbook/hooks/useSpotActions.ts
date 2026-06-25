@@ -11,6 +11,7 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { OrderType } from "@mysten/deepbook-v3";
 import { useQueryClient } from "@tanstack/react-query";
@@ -48,6 +49,7 @@ export function useSpotActions(poolKey: string) {
   const suiClient = useSuiClient();
   const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const { client, address, managerId } = useDeepBookClient();
   const { data: poolParams } = usePoolParams(poolKey);
   const [isPending, setIsPending] = useState(false);
@@ -105,6 +107,7 @@ export function useSpotActions(poolKey: string) {
         }
         if (!handled) toast.success(`${successMsg} · ${res.digest.slice(0, 10)}…`);
         queryClient.invalidateQueries({ queryKey: ["deepbook"] });
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -116,7 +119,7 @@ export function useSpotActions(poolKey: string) {
         setStatus(null);
       }
     },
-    [client, address, suiClient, signAndExecute, queryClient]
+    [client, address, suiClient, signAndExecute, queryClient, refreshAfterTx]
   );
 
   const placeOrder = useCallback(

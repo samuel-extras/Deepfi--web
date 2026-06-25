@@ -17,6 +17,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { Account, DeepBookClient, Order } from "@mysten/deepbook-v3";
@@ -133,6 +134,7 @@ export function useMarginManager(poolKey: string) {
   const address = useAddress();
   const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isCreating, setIsCreating] = useState(false);
   const pool = getMarginPoolMeta(poolKey);
 
@@ -205,6 +207,7 @@ export function useMarginManager(poolKey: string) {
         id
       );
       toast.success("Margin account created");
+      refreshAfterTx();
       return id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -212,7 +215,7 @@ export function useMarginManager(poolKey: string) {
     } finally {
       setIsCreating(false);
     }
-  }, [address, poolKey, signAndExecute, suiClient, queryClient]);
+  }, [address, poolKey, signAndExecute, suiClient, queryClient, refreshAfterTx]);
 
   return {
     managerId: query.data ?? null,
@@ -445,6 +448,7 @@ export function useMarginActions(poolKey: string) {
   const suiClient = useSuiClient();
   const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const { client, address, managerId } = useMarginClient(poolKey);
   const { data: poolParams } = usePoolParams(poolKey);
   const pool = getMarginPoolMeta(poolKey);
@@ -494,6 +498,7 @@ export function useMarginActions(poolKey: string) {
 
         toast.success(`${successMsg} · ${res.digest.slice(0, 10)}…`);
         queryClient.invalidateQueries({ queryKey: ["deepbook"] });
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -504,7 +509,7 @@ export function useMarginActions(poolKey: string) {
         setStatus(null);
       }
     },
-    [client, address, managerId, pool.base, pool.quote, suiClient, signAndExecute, queryClient]
+    [client, address, managerId, pool.base, pool.quote, suiClient, signAndExecute, queryClient, refreshAfterTx]
   );
 
   const depositCollateral = useCallback(
@@ -895,6 +900,7 @@ export function useEarnActions() {
   const suiClient = useSuiClient();
   const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const address = useAddress();
   const { data: capId } = useSupplierCap();
   const [isPending, setIsPending] = useState(false);
@@ -928,6 +934,7 @@ export function useEarnActions() {
         await suiClient.waitForTransaction({ digest: res.digest });
         toast.success(`${successMsg} · ${res.digest.slice(0, 10)}…`);
         queryClient.invalidateQueries({ queryKey: ["deepbook"] });
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -938,7 +945,7 @@ export function useEarnActions() {
         setStatus(null);
       }
     },
-    [address, suiClient, signAndExecute, queryClient]
+    [address, suiClient, signAndExecute, queryClient, refreshAfterTx]
   );
 
   const supply = useCallback(

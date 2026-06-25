@@ -12,6 +12,8 @@ export type OracleDTO = {
   minStrike: number; // USD
   tickSize: number; // USD
   settlementPrice: number | null;
+  /** When the market opened (epoch ms). expiry − activatedAt = its interval. */
+  activatedAt?: number | null;
 };
 
 export type OraclesResponse = {
@@ -94,6 +96,67 @@ export function clockTime(ms: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+/**
+ * On-chain → human scale for position contract quantities. The indexer's
+ * `open_quantity` is a raw u64 (e.g. 2_766_329); a "contract" pays $1 at
+ * settlement, so human contracts = raw / 1e6 (≈ 2.77). Redeems must pass the
+ * RAW quantity back on-chain.
+ */
+export const CONTRACT_SCALE = 1_000_000;
+
+// ─── market interval (cadence) ─────────────────────────────────────────────────
+/** Known market durations, shortest first. */
+export const PREDICT_CADENCES: { ms: number; label: string }[] = [
+  { ms: 5 * 60_000, label: "5m" },
+  { ms: 15 * 60_000, label: "15m" },
+  { ms: 30 * 60_000, label: "30m" },
+  { ms: 60 * 60_000, label: "1h" },
+  { ms: 4 * 60 * 60_000, label: "4h" },
+  { ms: 24 * 60 * 60_000, label: "1d" },
+];
+
+/** Nearest known cadence to a gap (±25% tolerance), else null. */
+export function nearestCadenceLabel(gapMs: number): string | null {
+  let best: { label: string; err: number } | null = null;
+  for (const c of PREDICT_CADENCES) {
+    const err = Math.abs(gapMs - c.ms);
+    if (err <= c.ms * 0.25 && (!best || err < best.err)) {
+      best = { label: c.label, err };
+    }
+  }
+  return best?.label ?? null;
+}
+
+/**
+ * Map each oracle to its rolling cadence — inferred from the spacing to its
+ * nearest same-asset neighbour (the gap between consecutive expiries), NOT the
+ * market's lifetime. On testnet markets are activated at arbitrary earlier
+ * times, so duration is meaningless; the expiry gap is the true cadence (this is
+ * how the markets-list page groups its series, so the two agree).
+ */
+export function cadenceByOracle(
+  oracles: { oracleId: string; asset: string; expiry: number }[],
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const byAsset = new Map<string, typeof oracles>();
+  for (const o of oracles) {
+    const arr = byAsset.get(o.asset) ?? [];
+    arr.push(o);
+    byAsset.set(o.asset, arr);
+  }
+  for (const arr of byAsset.values()) {
+    arr.sort((a, b) => a.expiry - b.expiry);
+    for (let i = 0; i < arr.length; i++) {
+      const prev = i > 0 ? arr[i].expiry - arr[i - 1].expiry : Infinity;
+      const next =
+        i < arr.length - 1 ? arr[i + 1].expiry - arr[i].expiry : Infinity;
+      const lbl = nearestCadenceLabel(Math.min(prev, next));
+      if (lbl) out.set(arr[i].oracleId, lbl);
+    }
+  }
+  return out;
 }
 
 export function snapToTick(price: number, minStrike: number, tick: number): number {

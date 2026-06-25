@@ -8,6 +8,10 @@ export interface AppSettings {
   disableBackgroundNotifications: boolean;
   hidePnl: boolean;
   animateOrderbook: boolean;
+  /** Prediction page view: false = classic markets list (default), true = pro terminal. */
+  predictionProView: boolean;
+  /** Whether the one-time "try the pro terminal?" prompt has been shown. */
+  proPromptSeen: boolean;
 }
 
 interface AppSettingsStore extends AppSettings {
@@ -23,6 +27,8 @@ const initialSettings: AppSettings = {
   disableBackgroundNotifications: false,
   hidePnl: false,
   animateOrderbook: true,
+  predictionProView: false,
+  proPromptSeen: false,
 };
 
 export const useAppSettingsStore = create<AppSettingsStore>()(
@@ -55,3 +61,6 @@ export const useHidePnl = () => useAppSettingsStore(state => state.hidePnl);
 
 export const useAnimateOrderbook = () =>
   useAppSettingsStore(state => state.animateOrderbook);
+
+export const usePredictionProView = () =>
+  useAppSettingsStore(state => state.predictionProView);

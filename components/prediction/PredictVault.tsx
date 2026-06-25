@@ -14,6 +14,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useSuiClient, useSuiClientQuery } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { toast } from "sonner";
 import {
   ArrowDownToLine,
@@ -76,6 +77,7 @@ export default function PredictVault() {
   const owner = account?.address;
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
 
   const [supplyAmount, setSupplyAmount] = useState("10");
   const [isPending, setIsPending] = useState(false);
@@ -144,6 +146,7 @@ export default function PredictVault() {
       const res = await signAndExecute({ transaction: txForSupply });
       await client.waitForTransaction({ digest: res.digest });
       toast.success(`Supplied ${amt} dUSDC to vault · received PLP shares`);
+      refreshAfterTx();
       setDepositOpen(false);
       void plpQ.refetch();
       void vaultQ.refetch();
@@ -170,6 +173,7 @@ export default function PredictVault() {
       const res = await signAndExecute({ transaction: tx });
       await client.waitForTransaction({ digest: res.digest });
       toast.success("Withdrew from vault · dUSDC returned to wallet");
+      refreshAfterTx();
       setWithdrawOpen(false);
       void plpQ.refetch();
       void vaultQ.refetch();

@@ -9,8 +9,7 @@ import {
 } from "./utils/urlParsing";
 
 const siteName = "Deepcast";
-const defaultTitle =
-  "Deepcast — On-chain Prediction Markets & DeFi on Sui";
+const defaultTitle = "Deepcast — On-chain Prediction Markets & DeFi on Sui";
 const defaultDescription =
   "Trade vol-surface-priced prediction markets on Sui with Deepcast — composed end-to-end with DeepBook spot, margin, and the PLP vault. Powered by DeepBook Predict.";
 const defaultKeywords = [
@@ -49,17 +48,17 @@ export const baseMetadata: Metadata = {
     card: "summary_large_image",
     title: defaultTitle,
     description: defaultDescription,
-    images: defaultImages.map(image => image.url),
+    images: defaultImages.map((image) => image.url),
   },
   icons: {
-    icon: "/deepcast-app-icon.svg",
-    shortcut: "/deepcast-app-icon.svg",
+    icon: "/deepcast-app-icon.png",
+    shortcut: "/deepcast-app-icon.png",
     apple: "/deepcast-app-icon.png",
   },
 };
 
 export function withDefaultMetadata(
-  overrides: Partial<Metadata> = {}
+  overrides: Partial<Metadata> = {},
 ): Metadata {
   const title = overrides.title ?? baseMetadata.title;
   const description = overrides.description ?? baseMetadata.description;

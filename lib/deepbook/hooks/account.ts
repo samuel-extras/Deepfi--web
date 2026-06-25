@@ -11,6 +11,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useMemo, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -33,6 +34,7 @@ export function useBalanceManager() {
   const address = useDeepBookAddress();
   const queryClient = useQueryClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isCreating, setIsCreating] = useState(false);
 
   const query = useQuery({
@@ -80,6 +82,7 @@ export function useBalanceManager() {
       localStorage.setItem(managerStorageKey(address), id);
       queryClient.setQueryData(["deepbook", "manager", DB_NETWORK, address], id);
       toast.success("Trading account created");
+      refreshAfterTx();
       return id;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -87,7 +90,7 @@ export function useBalanceManager() {
     } finally {
       setIsCreating(false);
     }
-  }, [address, signAndExecute, suiClient, queryClient]);
+  }, [address, signAndExecute, suiClient, queryClient, refreshAfterTx]);
 
   return {
     managerId: query.data ?? null,

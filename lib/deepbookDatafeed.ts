@@ -54,6 +54,10 @@ const RESOLUTION_TO_MS: Record<string, number> = {
 
 const LIVE_POLL_MS = 5_000;
 
+/** Synthetic BTC symbol (e.g. "BTCUSD") — a real BTC reference feed, not a
+ *  DeepBook pool. Used by the Predict terminal so the chart reads "BTC". */
+const isSyntheticBtc = (sym: string) => /btc/i.test(sym) && !sym.includes("_");
+
 /** pricescale = 10^decimals, sized to the price magnitude (dex heuristic). */
 function priceScaleFor(price: number): number {
   if (!price || price <= 0) return 100;
@@ -79,6 +83,80 @@ type Candle = [number, number, number, number, number, number] | {
   volume: number;
 };
 
+/** Datafeed interval → Coinbase granularity (seconds). Only these are valid. */
+const COINBASE_GRANULARITY: Record<string, number> = {
+  "1m": 60,
+  "5m": 300,
+  "15m": 900,
+  "1h": 3600,
+  "6h": 21600,
+  "1d": 86400,
+};
+
+/**
+ * Browser-direct BTC candles from CORS-enabled exchanges. The chart runs in the
+ * browser, which can reach these even when the server can't (proxy/geo egress
+ * limits) — that's why the testnet BTC pool + our server proxy come back empty.
+ * Binance covers every interval; Coinbase is the US-friendly fallback.
+ */
+async function fetchBtcBarsDirect(
+  interval: string,
+  startMs?: number,
+  endMs?: number
+): Promise<Bar[]> {
+  try {
+    const qs = new URLSearchParams({
+      symbol: "BTCUSDT",
+      interval,
+      limit: "1000",
+    });
+    if (startMs) qs.set("startTime", String(Math.floor(startMs)));
+    if (endMs) qs.set("endTime", String(Math.floor(endMs)));
+    const r = await fetch(`https://api.binance.com/api/v3/klines?${qs}`);
+    if (r.ok) {
+      const j = (await r.json()) as (string | number)[][];
+      const bars = j.map(k => ({
+        time: Number(k[0]),
+        open: Number(k[1]),
+        high: Number(k[2]),
+        low: Number(k[3]),
+        close: Number(k[4]),
+        volume: Number(k[5]),
+      }));
+      if (bars.length) return bars;
+    }
+  } catch {
+    /* try Coinbase */
+  }
+  const gran = COINBASE_GRANULARITY[interval];
+  if (gran) {
+    try {
+      const qs = new URLSearchParams({ granularity: String(gran) });
+      if (startMs) qs.set("start", new Date(startMs).toISOString());
+      if (endMs) qs.set("end", new Date(endMs).toISOString());
+      const r = await fetch(
+        `https://api.exchange.coinbase.com/products/BTC-USD/candles?${qs}`
+      );
+      if (r.ok) {
+        // coinbase rows: [time(s), low, high, open, close, volume]
+        const j = (await r.json()) as number[][];
+        const bars = j.map(k => ({
+          time: k[0] * 1000,
+          low: k[1],
+          high: k[2],
+          open: k[3],
+          close: k[4],
+          volume: k[5],
+        }));
+        if (bars.length) return bars.sort((a, b) => a.time - b.time);
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  return [];
+}
+
 async function fetchBars(
   poolKey: string,
   resolution: string,
@@ -86,6 +164,12 @@ async function fetchBars(
   endMs?: number
 ): Promise<Bar[]> {
   const interval = RESOLUTION_TO_INTERVAL[resolution] ?? "1h";
+  // Synthetic BTC symbol → fetch real BTC candles straight from the browser
+  // (CORS-enabled exchanges); fall back to the server route only if that fails.
+  if (isSyntheticBtc(poolKey)) {
+    const direct = await fetchBtcBarsDirect(interval, startMs, endMs);
+    if (direct.length) return direct.sort((a, b) => a.time - b.time);
+  }
   const qs = new URLSearchParams({ pool: poolKey, interval });
   if (startMs) qs.set("start", String(Math.floor(startMs)));
   if (endMs) qs.set("end", String(Math.floor(endMs)));
@@ -144,6 +228,31 @@ class DeepBookDatafeed implements IDatafeedChartApi, IExternalDatafeed {
   }
 
   async resolveSymbol(symbolName: string, onResolve: ResolveCallback) {
+    // Synthetic BTC reference symbol — label it as plain "BTC", no pool lookup.
+    if (isSyntheticBtc(symbolName)) {
+      const btcInfo: LibrarySymbolInfo = {
+        ticker: symbolName,
+        name: "BTC",
+        description: "Bitcoin · BTC/USD",
+        type: "crypto",
+        session: "24x7",
+        timezone: "Etc/UTC",
+        exchange: "Reference",
+        listed_exchange: "Binance",
+        format: "price",
+        minmov: 1,
+        pricescale: 100,
+        has_intraday: true,
+        has_weekly_and_monthly: true,
+        visible_plots_set: "ohlcv",
+        supported_resolutions: [...SUPPORTED_RESOLUTIONS] as ResolutionString[],
+        volume_precision: 2,
+        data_status: "streaming",
+      };
+      setTimeout(() => onResolve(btcInfo), 0);
+      return;
+    }
+
     const pool = getSpotPool(symbolName);
     let lastPrice = this.#lastPriceCache.get(symbolName) ?? 0;
     if (!lastPrice) {

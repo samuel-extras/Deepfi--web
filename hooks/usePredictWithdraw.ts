@@ -9,6 +9,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { toast } from "sonner";
 import { buildWithdrawFromManagerTx } from "@/lib/ptb/predict";
 import { waitForTxSuccess } from "@/lib/sui/txStatus";
@@ -17,6 +18,7 @@ export function usePredictWithdraw() {
   const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const withdraw = useCallback(
@@ -45,6 +47,7 @@ export function usePredictWithdraw() {
         toast.success(
           `Withdrew $${args.amountDusdc.toFixed(2)} · ${res.digest.slice(0, 8)}…`,
         );
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -53,7 +56,7 @@ export function usePredictWithdraw() {
         setIsWithdrawing(false);
       }
     },
-    [account?.address, client, signAndExecute],
+    [account?.address, client, signAndExecute, refreshAfterTx],
   );
 
   return { withdraw, isWithdrawing, isConnected: Boolean(account?.address) };

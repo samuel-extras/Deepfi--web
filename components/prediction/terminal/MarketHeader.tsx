@@ -8,6 +8,7 @@
 import type { OracleDTO, PricePoint, Selection } from "./types";
 import { DOWN_TEXT, UP, usd0, usd2 } from "./types";
 import { useCountdown } from "./useCountdown";
+import { TokenIcon } from "@/components/ui/token-icon";
 import { cn } from "@/lib/utils";
 
 export default function MarketHeader({
@@ -43,16 +44,19 @@ export default function MarketHeader({
       {/* strike + live spot */}
       <div className="flex items-center gap-3.5">
         <div>
-          <div className="flex  gap-3">
-            <div className="mt-0.5 flex flex-col items-baseline ">
-              <span
-                className={cn(
-                  "font-mono font-bold tabular-nums text-foreground",
-                  isRange ? "text-base" : "text-xl",
-                )}
-              >
-                {strikeValue}
-              </span>
+          <div className="flex  gap-3 items-center">
+            <TokenIcon symbol="BTC" size={isRange ? 40 : 40} />
+            <div className="mt-0.5 flex flex-col items-start">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    "font-mono font-bold tabular-nums text-foreground",
+                    isRange ? "text-base" : "text-xl",
+                  )}
+                >
+                  {strikeValue}
+                </span>
+              </div>
               <span className="text-[11px] text-muted-foreground">
                 {strikeCaption}
               </span>

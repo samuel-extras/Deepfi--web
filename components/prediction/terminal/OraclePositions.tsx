@@ -1,27 +1,28 @@
 "use client";
 
 /**
- * The connected wallet's open positions in the current oracle. Pulls the live
- * PredictManager portfolio (/api/portfolio) and filters to this market.
+ * Account positions strip for the pro terminal — spot-style: a tab bar
+ * (This Market / All Positions) over a sortable data table, with a per-row
+ * Redeem action (sells/claims the position back to the vault via predict::redeem
+ * / redeem_range). Data is the live PredictManager portfolio (/api/portfolio).
  */
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import { useActiveAccount } from "@/hooks/useActiveAccount";
-import { useQuery } from "@tanstack/react-query";
-
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { Button } from "@/components/ui/button";
+import { ConnectWalletDialog } from "@/components/wallet/ConnectWalletDialog";
+import { DataTable, SortHeader } from "@/components/spot/Account/DataTable";
 import { cn } from "@/lib/utils";
+import { RedeemModal } from "./RedeemModal";
 import type { OracleDTO } from "./types";
-import { usd0 } from "./types";
-import Link from "next/link";
+import { CONTRACT_SCALE, clockTime, usd0 } from "./types";
 
 type Position = {
   oracleId: string;
+  asset: string;
+  expiry: number;
   kind: "binary" | "range";
   isUp?: boolean;
   strike?: number;
@@ -35,6 +36,14 @@ type Position = {
   status: string;
 };
 
+type PortfolioResp = {
+  ok: boolean;
+  managerId: string | null;
+  positions?: Position[];
+};
+
+type TabId = "market" | "all";
+
 const usd = (n: number) =>
   n.toLocaleString("en-US", {
     style: "currency",
@@ -42,113 +51,236 @@ const usd = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-export default function OraclePositions({ oracle }: { oracle: OracleDTO }) {
-  const account = useActiveAccount();
-  const owner = account?.address;
+function PositionCell({ p, showMarket }: { p: Position; showMarket: boolean }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-2">
+        <Badge
+          variant={
+            p.kind === "range"
+              ? "secondary"
+              : p.isUp
+                ? "success"
+                : "destructive"
+          }
+        >
+          {p.kind === "range" ? "Range" : p.isUp ? "Up" : "Down"}
+        </Badge>
+        <span className="truncate text-xs font-bold text-foreground">
+          {p.kind === "binary"
+            ? `${p.isUp ? "Above" : "Below"} ${usd0(p.strike ?? 0)}`
+            : `${usd0(p.lowerStrike ?? 0)} – ${usd0(p.higherStrike ?? 0)}`}
+        </span>
+      </div>
+      {showMarket ? (
+        <div className="mt-0.5 text-[10px] text-nav-inactive">
+          {p.asset} · settles {clockTime(p.expiry)}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
-  const q = useQuery({
+function makeColumns(
+  showMarket: boolean,
+  onRedeem: (p: Position) => void,
+): ColumnDef<Position>[] {
+  const right = "block text-right tabular-nums";
+  return [
+    {
+      id: "position",
+      header: "Position",
+      cell: ({ row }) => <PositionCell p={row.original} showMarket={showMarket} />,
+    },
+    {
+      accessorKey: "openQty",
+      header: ({ column }) => (
+        <SortHeader column={column} title="Contracts" align="right" />
+      ),
+      cell: ({ row }) => (
+        <span className={right}>
+          {(row.original.openQty / CONTRACT_SCALE).toFixed(2)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "cost",
+      header: ({ column }) => (
+        <SortHeader column={column} title="Cost" align="right" />
+      ),
+      cell: ({ row }) => <span className={right}>{usd(row.original.cost)}</span>,
+    },
+    {
+      accessorKey: "markValue",
+      header: ({ column }) => (
+        <SortHeader column={column} title="Value" align="right" />
+      ),
+      cell: ({ row }) => (
+        <span className={right}>{usd(row.original.markValue)}</span>
+      ),
+    },
+    {
+      accessorKey: "unrealizedPnl",
+      header: ({ column }) => (
+        <SortHeader column={column} title="PnL" align="right" />
+      ),
+      cell: ({ row }) => {
+        const v = row.original.unrealizedPnl;
+        return (
+          <span
+            className={cn(
+              right,
+              "font-semibold",
+              v >= 0 ? "text-primary" : "text-destructive",
+            )}
+          >
+            {v >= 0 ? "+" : ""}
+            {usd(v)}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <span className="capitalize text-nav-inactive">
+          {row.original.status}
+        </span>
+      ),
+    },
+    {
+      id: "action",
+      header: () => <div className="text-right">Action</div>,
+      cell: ({ row }) => {
+        const p = row.original;
+        // Fully redeemed (< 0.005 contracts) → nothing left to act on.
+        if (p.openQty / CONTRACT_SCALE < 0.005)
+          return (
+            <div className="text-right text-[10px] text-nav-inactive">
+              Redeemed
+            </div>
+          );
+        return (
+          <div className="text-right">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => onRedeem(p)}
+              className="h-7 rounded-full px-3 text-xs"
+            >
+              {p.status === "settled" ? "Claim" : "Redeem"}
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+}
+
+export default function OraclePositions({ oracle }: { oracle: OracleDTO }) {
+  const owner = useActiveAccount()?.address;
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<TabId>("market");
+  const [redeemTarget, setRedeemTarget] = useState<Position | null>(null);
+
+  const q = useQuery<PortfolioResp>({
     queryKey: ["predict", "portfolio", owner],
     queryFn: () => fetch(`/api/portfolio?owner=${owner}`).then((r) => r.json()),
     enabled: !!owner,
     refetchInterval: 10_000,
   });
 
-  if (!owner) {
-    return (
-      <Empty className="border-0 py-10">
-        <EmptyHeader>
-          <EmptyTitle>Wallet not connected</EmptyTitle>
-          <EmptyDescription>
-            Connect your wallet to see your positions in this market.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
+  const managerId = q.data?.managerId ?? null;
+  const all = useMemo(() => q.data?.positions ?? [], [q.data]);
+  const mine = useMemo(
+    () => all.filter((p) => p.oracleId === oracle.oracleId),
+    [all, oracle.oracleId],
+  );
 
-  if (q.isLoading) {
-    return (
-      <div className="flex flex-col gap-3 p-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <div key={i} className="flex items-center justify-between gap-3">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Skeleton className="h-3.5 w-40" />
-              <Skeleton className="h-2.5 w-28" />
-            </div>
-            <Skeleton className="h-8 w-20" />
-          </div>
-        ))}
-      </div>
-    );
-  }
+  const rows = tab === "market" ? mine : all;
+  const columns = useMemo(
+    () => makeColumns(tab === "all", setRedeemTarget),
+    [tab],
+  );
 
-  const all: Position[] = q.data?.positions ?? [];
-  const mine = all.filter((p) => p.oracleId === oracle.oracleId);
-
-  if (!mine.length) {
-    return (
-      <Empty className="border-0 py-10">
-        <EmptyHeader>
-          <EmptyTitle>No open positions</EmptyTitle>
-          <EmptyDescription>
-            You have no positions in this market.{" "}
-            <Link href="/portfolio">View full portfolio →</Link>
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    );
-  }
+  const TABS: { id: TabId; label: string; count: number }[] = [
+    { id: "market", label: "This Market", count: mine.length },
+    { id: "all", label: "All Positions", count: all.length },
+  ];
 
   return (
-    <div className="divide-y divide-border">
-      {mine.map((p, i) => {
-        const up = p.unrealizedPnl >= 0;
-        return (
-          <div
-            key={i}
-            className="flex items-center justify-between gap-3 px-4 py-3"
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={
-                    p.kind === "range"
-                      ? "secondary"
-                      : p.isUp
-                        ? "success"
-                        : "destructive"
-                  }
-                >
-                  {p.kind === "range" ? "Range" : p.isUp ? "Up" : "Down"}
-                </Badge>
-                <span className="truncate text-xs font-bold text-foreground">
-                  {p.kind === "binary"
-                    ? `${p.isUp ? "Above" : "Below"} ${usd0(p.strike ?? 0)}`
-                    : `${usd0(p.lowerStrike ?? 0)} – ${usd0(p.higherStrike ?? 0)}`}
-                </span>
-              </div>
-              <div className="mt-0.5 text-[10px] text-muted-foreground">
-                {p.openQty.toFixed(2)} contracts · cost {usd(p.cost)} ·{" "}
-                {p.status}
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <div className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                {usd(p.markValue)}
-              </div>
-              <div
-                className={cn(
-                  "font-mono text-[10px] font-bold tabular-nums",
-                  up ? "text-primary" : "text-destructive",
-                )}
-              >
-                {up ? "+" : ""}
-                {usd(p.unrealizedPnl)}
-              </div>
-            </div>
+    <div className="flex h-full flex-col bg-[#121417]">
+      {/* tab bar */}
+      <div className="flex h-10 shrink-0 items-center border-b border-border">
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "relative h-full px-4 text-xs transition-colors",
+                active ? "text-white" : "text-nav-inactive hover:text-white",
+              )}
+            >
+              {t.label}
+              {t.count > 0 ? ` (${t.count})` : ""}
+              {active ? (
+                <div className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-foreground" />
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* body */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {!owner ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-nav-inactive">
+              Connect your wallet to see your positions.
+            </p>
+            <ConnectWalletDialog
+              trigger={
+                <Button className="h-8 rounded-full bg-primary px-5 text-xs font-semibold text-[#121417] hover:bg-primary/90">
+                  Connect wallet
+                </Button>
+              }
+            />
           </div>
-        );
-      })}
+        ) : q.isLoading ? (
+          <div className="p-4 text-xs text-nav-inactive">Loading positions…</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={rows}
+            empty={
+              tab === "market"
+                ? "No positions in this market."
+                : "No open positions yet."
+            }
+          />
+        )}
+      </div>
+
+      <RedeemModal
+        key={
+          redeemTarget
+            ? `${redeemTarget.oracleId}:${redeemTarget.kind}:${redeemTarget.strike ?? ""}:${redeemTarget.lowerStrike ?? ""}:${redeemTarget.higherStrike ?? ""}`
+            : "none"
+        }
+        position={redeemTarget}
+        managerId={managerId}
+        onOpenChange={(o) => {
+          if (!o) setRedeemTarget(null);
+        }}
+        onRedeemed={() =>
+          queryClient.invalidateQueries({
+            queryKey: ["predict", "portfolio", owner],
+          })
+        }
+      />
     </div>
   );
 }

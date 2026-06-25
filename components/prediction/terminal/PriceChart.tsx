@@ -30,7 +30,8 @@ type Props = {
   points: PricePoint[];
   expiry: number;
   sel: Selection;
-  height?: number;
+  /** px number, or a CSS height like "100%" to fill a flex container. */
+  height?: number | string;
 };
 
 /** Right-edge price tag rendered as a ReferenceLine label. */
@@ -181,7 +182,7 @@ export default function PriceChart({
             fontSize={10}
             tickLine={false}
             axisLine={false}
-            width={52}
+            width={2}
             tickFormatter={(v) =>
               yMax - yMin < 2500 ? usd0(v) : compactUsd(v)
             }
@@ -304,7 +305,13 @@ export default function PriceChart({
                 stroke={BTC}
                 strokeOpacity={0.35}
                 strokeDasharray="2 3"
-                label={<PriceTag value={usd2(last.spot)} fill={BTC} textFill="#081A12" />}
+                label={
+                  <PriceTag
+                    value={usd2(last.spot)}
+                    fill={BTC}
+                    textFill="#081A12"
+                  />
+                }
               />
             </>
           ) : null}

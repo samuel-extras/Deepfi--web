@@ -15,7 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,16 +49,22 @@ export function DataTable<TData, TValue>({
   return (
     <Table className="text-xs">
       <TableHeader>
-        {table.getHeaderGroups().map(group => (
-          <TableRow key={group.id} className="border-border hover:bg-transparent">
-            {group.headers.map(header => (
+        {table.getHeaderGroups().map((group) => (
+          <TableRow
+            key={group.id}
+            className="border-border hover:bg-transparent"
+          >
+            {group.headers.map((header) => (
               <TableHead
                 key={header.id}
                 className="h-9 px-4 text-[11px] font-normal text-nav-inactive"
               >
                 {header.isPlaceholder
                   ? null
-                  : flexRender(header.column.columnDef.header, header.getContext())}
+                  : flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )}
               </TableHead>
             ))}
           </TableRow>
@@ -66,12 +72,12 @@ export function DataTable<TData, TValue>({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.length ? (
-          table.getRowModel().rows.map(row => (
+          table.getRowModel().rows.map((row) => (
             <TableRow
               key={row.id}
               className="border-border/40 hover:bg-[#1A1D1F]/50"
             >
-              {row.getVisibleCells().map(cell => (
+              {row.getVisibleCells().map((cell) => (
                 <TableCell key={cell.id} className="px-4 py-2 align-top">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
@@ -105,7 +111,11 @@ export function SortHeader<TData, TValue>({
 }) {
   const sorted = column.getIsSorted();
   const Icon =
-    sorted === "asc" ? ArrowUp : sorted === "desc" ? ArrowDown : ChevronsUpDown;
+    sorted === "asc"
+      ? ChevronUp
+      : sorted === "desc"
+        ? ChevronDown
+        : ChevronsUpDown;
   return (
     <div className={cn("flex", align === "right" && "justify-end")}>
       <Button

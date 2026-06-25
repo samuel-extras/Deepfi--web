@@ -11,6 +11,7 @@ import { useActiveAccount } from "@/hooks/useActiveAccount";
 import { useCallback, useRef, useState } from "react";
 import { useSuiClient } from "@mysten/dapp-kit";
 import { useSignAndExecuteTransaction } from "@/lib/zklogin/useSponsoredExecute";
+import { useRefreshAfterTx } from "@/hooks/useRefreshAfterTx";
 import { Transaction } from "@mysten/sui/transactions";
 import { bcs } from "@mysten/sui/bcs";
 import { toast } from "sonner";
@@ -39,6 +40,7 @@ export function usePredictHedgedSupply() {
   const account = useActiveAccount();
   const client = useSuiClient();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const refreshAfterTx = useRefreshAfterTx();
   const [isPending, setIsPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const managerIdRef = useRef<string | null>(null);
@@ -176,6 +178,7 @@ export function usePredictHedgedSupply() {
             ? `Supplied ${a.supplyDusdc} dUSDC + crash hedge · ${res.digest.slice(0, 8)}…`
             : `Supplied ${a.supplyDusdc} dUSDC`,
         );
+        refreshAfterTx();
         return res.digest;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -185,7 +188,7 @@ export function usePredictHedgedSupply() {
         setStatus(null);
       }
     },
-    [account?.address, client, signAndExecute, ensureManager, sizeHedge],
+    [account?.address, client, signAndExecute, ensureManager, sizeHedge, refreshAfterTx],
   );
 
   return { execute, isPending, status, isConnected: Boolean(account?.address) };

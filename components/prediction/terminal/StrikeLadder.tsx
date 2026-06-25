@@ -186,6 +186,42 @@ function PriceBtn({
   );
 }
 
+/**
+ * Compact price cell for the narrow "book panel" layout — just the ¢ price,
+ * colour-coded and clickable, no Above/Below button chrome so the ladder fits a
+ * thin column without horizontal overflow.
+ */
+function PriceCell({
+  price,
+  est,
+  tone,
+  selected,
+  onClick,
+}: {
+  price: number | null;
+  est: boolean;
+  tone: "up" | "down";
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const palette =
+    tone === "up"
+      ? selected
+        ? "bg-[#02DA8B] text-[#081A12]"
+        : "text-[#02DA8B] hover:bg-[#02DA8B]/15"
+      : selected
+        ? "bg-[#EF4444] text-white"
+        : "text-[#FF5C5C] hover:bg-[#EF4444]/15";
+  return (
+    <button
+      onClick={onClick}
+      className={`min-w-[46px] cursor-pointer rounded px-1.5 py-1 text-right text-xs font-bold tabular-nums transition-colors ${palette}`}
+    >
+      {price != null ? `${est ? "~" : ""}${Math.round(price * 100)}¢` : "—"}
+    </button>
+  );
+}
+
 function SpotDivider({ spot }: { spot: number }) {
   return (
     <div className="flex items-center gap-2 px-3 py-0.5">
@@ -208,6 +244,7 @@ export default function StrikeLadder({
   onSelectBinary,
   onSelectRange,
   bare = false,
+  compact = false,
 }: {
   oracle: OracleDTO;
   spot: number | null;
@@ -219,6 +256,8 @@ export default function StrikeLadder({
   onSelectRange: (lowerUsd: number, higherUsd: number) => void;
   /** drop the outer card chrome when hosted inside the market tabs */
   bare?: boolean;
+  /** narrow "book panel" layout: ¢-price cells instead of Above/Below buttons */
+  compact?: boolean;
 }) {
   const tick = Math.max(oracle.tickSize, 1);
   const ref = svi?.forward ?? spot ?? null;
@@ -282,17 +321,36 @@ export default function StrikeLadder({
           : "overflow-hidden rounded-xl border border-white/5 bg-[#16181D]"
       }
     >
-      <div className="flex items-center justify-between border-b border-white/5 px-4 py-2.5">
+      <div
+        className={`flex items-center justify-between border-b border-white/5 py-2.5 ${
+          compact ? "px-2.5" : "px-4"
+        }`}
+      >
         <span className="text-xs font-bold text-white">
           {sel.posType === "binary" ? "Strike ladder" : "Range bands"}
         </span>
         <span className="text-[10px] text-[#6B7280]">
-          {binaryQuotes || rangeQuotes
-            ? "live on-chain quotes"
-            : "~ SVI fair value"}
-          {" · "}rung {usd0(step)} · tick {usd0(tick)}
+          {compact ? (
+            <>rung {usd0(step)}</>
+          ) : (
+            <>
+              {binaryQuotes || rangeQuotes
+                ? "live on-chain quotes"
+                : "~ SVI fair value"}
+              {" · "}rung {usd0(step)} · tick {usd0(tick)}
+            </>
+          )}
         </span>
       </div>
+
+      {/* compact column labels (binary): the two ¢ cells are Above / Below */}
+      {compact && sel.posType === "binary" ? (
+        <div className="grid grid-cols-[1fr_auto_auto] gap-2 border-b border-white/5 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wide text-[#6B7280]">
+          <span>Strike</span>
+          <span className="min-w-[46px] text-right text-[#02DA8B]/80">Above</span>
+          <span className="min-w-[46px] text-right text-[#FF5C5C]/80">Below</span>
+        </div>
+      ) : null}
 
       {sel.posType === "binary" ? (
         <div className="divide-y divide-white/[0.04]">
@@ -310,9 +368,9 @@ export default function StrikeLadder({
             return (
               <div key={strike}>
                 <div
-                  className={`relative grid grid-cols-[1fr_auto_auto] items-center gap-2 px-4 py-2 transition-colors ${
-                    isSel ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                  }`}
+                  className={`relative grid grid-cols-[1fr_auto_auto] items-center gap-2 transition-colors ${
+                    compact ? "px-2.5 py-1.5" : "px-4 py-2"
+                  } ${isSel ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}
                 >
                   {/* probability wash */}
                   {prob != null ? (
@@ -321,7 +379,7 @@ export default function StrikeLadder({
                       style={{ width: `${prob * 100}%` }}
                     />
                   ) : null}
-                  <div className="relative flex items-baseline gap-2">
+                  <div className="relative flex min-w-0 items-baseline gap-1.5">
                     <span className="font-mono text-sm font-semibold text-white tabular-nums">
                       {usd0(strike)}
                     </span>
@@ -330,7 +388,7 @@ export default function StrikeLadder({
                         ATM
                       </span>
                     ) : null}
-                    {spot != null ? (
+                    {!compact && spot != null ? (
                       <span
                         className={`font-mono text-[10px] tabular-nums ${
                           strike >= spot
@@ -343,22 +401,43 @@ export default function StrikeLadder({
                       </span>
                     ) : null}
                   </div>
-                  <PriceBtn
-                    label="Above"
-                    price={upPrice}
-                    est={chainUp == null}
-                    tone="up"
-                    selected={isSel && sel.direction === "up"}
-                    onClick={() => onSelectBinary(strike, "up")}
-                  />
-                  <PriceBtn
-                    label="Below"
-                    price={dnPrice}
-                    est={chainDn == null}
-                    tone="down"
-                    selected={isSel && sel.direction === "down"}
-                    onClick={() => onSelectBinary(strike, "down")}
-                  />
+                  {compact ? (
+                    <>
+                      <PriceCell
+                        price={upPrice}
+                        est={chainUp == null}
+                        tone="up"
+                        selected={isSel && sel.direction === "up"}
+                        onClick={() => onSelectBinary(strike, "up")}
+                      />
+                      <PriceCell
+                        price={dnPrice}
+                        est={chainDn == null}
+                        tone="down"
+                        selected={isSel && sel.direction === "down"}
+                        onClick={() => onSelectBinary(strike, "down")}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <PriceBtn
+                        label="Above"
+                        price={upPrice}
+                        est={chainUp == null}
+                        tone="up"
+                        selected={isSel && sel.direction === "up"}
+                        onClick={() => onSelectBinary(strike, "up")}
+                      />
+                      <PriceBtn
+                        label="Below"
+                        price={dnPrice}
+                        est={chainDn == null}
+                        tone="down"
+                        selected={isSel && sel.direction === "down"}
+                        onClick={() => onSelectBinary(strike, "down")}
+                      />
+                    </>
+                  )}
                 </div>
                 {showSpotAfter ? <SpotDivider spot={spot} /> : null}
               </div>
@@ -375,9 +454,9 @@ export default function StrikeLadder({
             return (
               <div
                 key={`${lo}-${hi}`}
-                className={`relative grid grid-cols-[1fr_auto] items-center gap-2 px-4 py-2 transition-colors ${
-                  isSel ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"
-                }`}
+                className={`relative grid grid-cols-[1fr_auto] items-center gap-2 transition-colors ${
+                  compact ? "px-2.5 py-1.5" : "px-4 py-2"
+                } ${isSel ? "bg-white/[0.03]" : "hover:bg-white/[0.02]"}`}
               >
                 {prob != null ? (
                   <div
@@ -385,23 +464,35 @@ export default function StrikeLadder({
                     style={{ width: `${prob * 100}%` }}
                   />
                 ) : null}
-                <div className="relative flex items-baseline gap-2">
-                  <span className="font-mono text-sm font-semibold text-white tabular-nums">
+                <div className="relative flex min-w-0 items-baseline gap-1.5">
+                  <span className="font-mono text-xs font-semibold text-white tabular-nums">
                     {usd0(lo)} – {usd0(hi)}
                   </span>
-                  <span className="text-[10px] text-[#6B7280]">
-                    {usd0(hi - lo)} wide
-                    {lo + hi === 2 * atm ? " · centered" : ""}
-                  </span>
+                  {!compact ? (
+                    <span className="text-[10px] text-[#6B7280]">
+                      {usd0(hi - lo)} wide
+                      {lo + hi === 2 * atm ? " · centered" : ""}
+                    </span>
+                  ) : null}
                 </div>
-                <PriceBtn
-                  label="In range"
-                  price={price}
-                  est={chain == null}
-                  tone="up"
-                  selected={isSel}
-                  onClick={() => onSelectRange(lo, hi)}
-                />
+                {compact ? (
+                  <PriceCell
+                    price={price}
+                    est={chain == null}
+                    tone="up"
+                    selected={isSel}
+                    onClick={() => onSelectRange(lo, hi)}
+                  />
+                ) : (
+                  <PriceBtn
+                    label="In range"
+                    price={price}
+                    est={chain == null}
+                    tone="up"
+                    selected={isSel}
+                    onClick={() => onSelectRange(lo, hi)}
+                  />
+                )}
               </div>
             );
           })}

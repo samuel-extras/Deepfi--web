@@ -27,7 +27,8 @@ interface SviSmileChartProps {
   forward?: number;
   lowerStrike?: number;
   higherStrike?: number;
-  height?: number;
+  /** px number, or a percent like "100%" to fill a flex container. */
+  height?: number | `${number}%`;
 }
 
 const usd = (n: number) =>
@@ -47,7 +48,12 @@ export default function SviSmileChart({
   if (!points.length) return null;
 
   return (
-    <ResponsiveContainer width="100%" height={height} minWidth={100} minHeight={height}>
+    <ResponsiveContainer
+      width="100%"
+      height={height}
+      minWidth={100}
+      minHeight={typeof height === "number" ? height : 0}
+    >
       <AreaChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: -16 }}>
         <defs>
           <linearGradient id="smileGrad" x1="0" y1="0" x2="0" y2="1">

@@ -173,6 +173,7 @@ export default function Navbar() {
   const hideSmallBalances = useAppSettingsStore((s) => s.hideSmallBalances);
   const hidePnl = useAppSettingsStore((s) => s.hidePnl);
   const animateOrderbook = useAppSettingsStore((s) => s.animateOrderbook);
+  const predictionProView = useAppSettingsStore((s) => s.predictionProView);
   const updateSetting = useAppSettingsStore((s) => s.updateSetting);
   const toggleMobileNav = React.useCallback(() => {
     setIsMobileNavOpen((prev) => !prev);
@@ -212,8 +213,13 @@ export default function Navbar() {
         label: "Animate Order Book",
         checked: animateOrderbook,
       },
+      {
+        id: "prediction-pro-view",
+        label: "Pro Prediction Terminal",
+        checked: predictionProView,
+      },
     ],
-    [hideSmallBalances, hidePnl, animateOrderbook],
+    [hideSmallBalances, hidePnl, animateOrderbook, predictionProView],
   );
 
   const handleSettingChange = React.useCallback(
@@ -230,6 +236,9 @@ export default function Navbar() {
           break;
         case "animate-orderbook":
           updateSetting("animateOrderbook", checked);
+          break;
+        case "prediction-pro-view":
+          updateSetting("predictionProView", checked);
           break;
       }
     },
